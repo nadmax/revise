@@ -1,17 +1,24 @@
-use std::io::{stdin, stdout, Write, Error};
-use termion::raw::IntoRawMode;
+use crate::Terminal;
+
+use std::io::Error;
 use termion::event::Key;
-use termion::input::TermRead;
-use termion::{clear, cursor};
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub struct Editor {
     should_quit: bool,
+    terminal: Terminal,
 }
 
 impl Editor {
-    pub fn run(&mut self) {
-        let _stdout = stdout().into_raw_mode().unwrap();
+    pub fn new() -> Self {
+        Self {
+            should_quit: false,
+            terminal: Terminal::new().expect("Failed to initialize terminal"),
+        }
+    }
 
+    pub fn run(&mut self) {
         loop {
             if let Err(error) = self.process_keypress() {
                 die(&error);
@@ -27,50 +34,60 @@ impl Editor {
         }
     }
 
-    pub fn default() -> Self {
-        Self {should_quit: false}
-    }
-
     fn process_keypress(&mut self) -> Result<(), Error> {
-        let pressed_key = read_key()?;
+        let pressed_key = Terminal::read_key()?;
 
-        match pressed_key {
-            Key::Ctrl('q') => self.should_quit = true,
-            _ => (),
-        }
+        if let Key::Ctrl('q') = pressed_key { self.should_quit = true}
 
         Ok(())
     }
 
     fn refresh_screen(&self) -> Result<(), Error> {
-        print!("{}{}", clear::All, cursor::Goto(1, 1));
-
+        Terminal::cursor_hide();
+        Terminal::cursor_position(0, 0);
+        
         if self.should_quit {
+            Terminal::clear_screen();
             println!("Goodbye!\r");
         } else {
             self.draw_rows();
-            print!("{}", cursor::Goto(1, 1));
+            Terminal::cursor_position(0, 0);
         }
 
-        stdout().flush()
+        Terminal::cursor_show();
+        Terminal::flush()
     }
 
     fn draw_rows(&self) {
-        for _ in 0..24 {
-            println!("~\r");
+        let height = self.terminal.size().height;
+
+        for row in 0..height - 1 {
+            Terminal::clear_current_line();
+            
+            if row == height / 3 {
+                self.draw_welcome_message();        
+            } else {
+                println!("~\r");
+            }
         }
+    }
+    
+    fn draw_welcome_message(&self) {
+        let mut welcome_message = format!("Editor -- version{VERSION}\r");
+        let width = self.terminal.size().width as usize;
+        let len = welcome_message.len();
+        let padding = width.saturating_sub(len) / 2;
+        let spaces = "".repeat(padding.saturating_sub(1));
+
+        welcome_message = format!("~{spaces}{welcome_message}");
+        welcome_message.truncate(width);
+        
+        println!("{welcome_message}\r");
     }
 }
 
 fn die(err: &Error) {
-    print!("{}", clear::All);
-    panic!("{}", err)
-}
+    Terminal::clear_screen();
 
-fn read_key() -> Result<Key, Error> {
-    loop {
-        if let Some(key) = stdin().lock().keys().next() {
-            return key;
-        }
-    }
+    panic!("{}", err)
 }
