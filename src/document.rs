@@ -1,14 +1,16 @@
 use crate::Row;
 use crate::Position;
 
-use std::fs;
-use std::io::Error;
+
+use std::fs::{File, read_to_string};
+use std::io::{Error, Write};
 use std::cmp::Ordering;
 
 #[derive(Default)]
 pub struct Document {
     rows: Vec<Row>,
     pub filename: Option<String>,
+    modified: bool,
 }
 
 impl Document {
@@ -16,7 +18,7 @@ impl Document {
     /// 
     /// Will return `Error` if it fails read filename
     pub fn open(filename: &str) -> Result<Self, Error> {
-        let contents = fs::read_to_string(filename)?;
+        let contents = read_to_string(filename)?;
         let mut rows = Vec::new();
 
         for value in contents.lines() {
@@ -26,6 +28,7 @@ impl Document {
         Ok(Self {
             rows,
             filename: Some(filename.to_string()),
+            modified: false
         })
     }
 
@@ -70,6 +73,8 @@ impl Document {
             },
             Ordering::Greater => (),
         }
+
+        self.modified = true;
     }
 
     /// # Panics
@@ -81,6 +86,8 @@ impl Document {
         if at.y >= len {
             return;
         }
+
+        self.modified = true;
 
         if at.x == self.rows.get_mut(at.y).unwrap().len() && at.y < len - 1 {
             let next_row = self.rows.remove(at.y + 1);
@@ -98,13 +105,32 @@ impl Document {
         row.delete(at.x);
     }
 
-    fn insert_newline(&mut self, at: &Position) {
-        let len = self.len();
-        if at.y > len {
-            return;
+
+    /// # Errors
+    /// 
+    /// Will return `Error` if it fails to create a file to save
+    pub fn save(&mut self) -> Result<(), Error> {
+        if let Some(filename) = &self.filename {
+            let mut file = File::create(filename)?;
+
+            for row in &self.rows {
+                file.write_all(row.as_bytes())?;
+                file.write_all(b"\n")?;
+            }
+
+            self.modified = false;
         }
 
-        if at.y == len {
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn is_modified(&self) -> bool {
+        self.modified
+    }
+
+    fn insert_newline(&mut self, at: &Position) {
+        if at.y == self.len() {
             self.rows.push(Row::default());
 
             return;
@@ -113,7 +139,7 @@ impl Document {
         let new_row = self.rows.get_mut(at.y)
             .unwrap()
             .split(at.x);
-        
+
         self.rows.insert(at.y + 1, new_row);
     }
 }
