@@ -6,6 +6,7 @@ use std::io::Error;
 #[derive(Default)]
 pub struct Document {
     rows: Vec<Row>,
+    pub filename: Option<String>,
 }
 
 impl Document {
@@ -21,7 +22,8 @@ impl Document {
         }
 
         Ok(Self {
-            rows
+            rows,
+            filename: Some(filename.to_string()),
         })
     }
 
