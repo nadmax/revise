@@ -34,4 +34,9 @@ impl Document {
     pub fn is_empty(&self) -> bool {
         self.rows.is_empty()
     }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.rows.len()
+    }
 }
