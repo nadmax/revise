@@ -31,7 +31,11 @@ impl Row {
             .skip(start)
             .take(end - start)
         {
-            result.push_str(grapheme);
+            if grapheme == "\t" {
+                result.push(' ');
+            } else {
+                result.push_str(grapheme);
+            }
         }
 
         result
