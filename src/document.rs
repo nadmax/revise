@@ -3,6 +3,7 @@ use crate::Position;
 
 use std::fs;
 use std::io::Error;
+use std::cmp::Ordering;
 
 #[derive(Default)]
 pub struct Document {
@@ -43,25 +44,37 @@ impl Document {
         self.rows.len()
     }
 
+    /// # Panics
+    /// 
+    /// Will panic if there is no row to insert
     pub fn insert(&mut self, at: &Position, c: char) {
+        let len = self.len();
+        
         if c == '\n' {
             self.insert_newline(at);
 
             return;
         }
-        
-        if at.y == self.len() {
-            let mut row = Row::default();
 
-            row.insert(0, c);
-            self.rows.push(row);
-        } else if at.y < self.len() {
-            let row = self.rows.get_mut(at.y).unwrap();
-            
-            row.insert(at.x, c);
+        match at.y.cmp(&len) {
+            Ordering::Equal => {
+                let mut row = Row::default();
+        
+                row.insert(0, c);
+                self.rows.push(row);
+            },
+            Ordering::Less => {
+                let row = self.rows.get_mut(at.y).unwrap();
+                
+                row.insert(at.x, c);
+            },
+            Ordering::Greater => (),
         }
     }
 
+    /// # Panics
+    /// 
+    /// Will panic if there is no row to delete
     pub fn delete(&mut self, at: &Position) {
         let len = self.len();
 
