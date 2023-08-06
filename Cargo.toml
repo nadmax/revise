@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 termion = "2.0.1"
+unicode-segmentation = "1.10.1"
