@@ -1,6 +1,7 @@
 use crate::Row;
 use crate::Position;
 
+
 use std::fs::{File, read_to_string};
 use std::io::{Error, Write};
 use std::cmp::Ordering;
@@ -104,6 +105,7 @@ impl Document {
         row.delete(at.x);
     }
 
+
     /// # Errors
     /// 
     /// Will return `Error` if it fails to create a file to save
@@ -130,12 +132,14 @@ impl Document {
     fn insert_newline(&mut self, at: &Position) {
         if at.y == self.len() {
             self.rows.push(Row::default());
+
             return;
         }
 
         let new_row = self.rows.get_mut(at.y)
             .unwrap()
             .split(at.x);
+
         self.rows.insert(at.y + 1, new_row);
     }
 }
