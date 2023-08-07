@@ -9,14 +9,10 @@ pub struct Row {
 
 impl From<&str> for Row {
     fn from(slice: &str) -> Self {
-        let mut row = Self {
+        Self {
             string: String::from(slice),
-            len: 0,
-        };
-
-        row.update_len();
-
-        row
+            len: slice.graphemes(true).count(),
+        }
     }
 }
 
@@ -56,20 +52,31 @@ impl Row {
         if at >= self.len() {
             self.string.push(c);
         } else {
-            let mut result: String = self.string[..]
-                .graphemes(true)
-                .take(at)
-                .collect();
-            let remainder: String = self.string[..]
-                .graphemes(true)
-                .skip(at)
-                .collect();
+            self.len += 1;
             
-            result.push(c);
-            result.push_str(&remainder);
-            self.string = result;
+            return;
         }
-        self.update_len();
+        
+        let mut result: String = String::new();
+        let mut length = 0;
+
+        for (index, grapheme) in self
+            .string[..]
+            .graphemes(true)
+            .enumerate()
+        {
+            length += 1;
+
+            if index == at {
+                length += 1;
+                result.push(c);
+            }
+            
+            result.push_str(grapheme);
+        }
+
+        self.len = length;
+        self.string = result;
     }
 
     pub fn delete(&mut self, at: usize){
@@ -77,50 +84,61 @@ impl Row {
             return;
         }
 
-        let mut result: String = self.string[..]
+        let mut result: String = String::new();
+        let mut length = 0;
+
+        for (index, grapheme) in self
+            .string[..]
             .graphemes(true)
-            .take(at)
-            .collect();
-        let remainder: String = self.string[..]
-            .graphemes(true)
-            .skip(at + 1)
-            .collect();
-    
-        result.push_str(&remainder);
+            .enumerate()
+        {
+            if index != at {
+                length += 1;
+                result.push_str(grapheme);
+            }
+        }
+
+        self.len = length;
         self.string = result;
-        
-        self.update_len();
     }
 
     pub fn append(&mut self, new: &Self) {
         self.string = format!("{}{}", self.string, new.string);
-
-        self.update_len();
+        self.len += new.len;
     }
 
     #[must_use]
     pub fn split(&mut self, at: usize) -> Self {
-        let beginning: String = self.string[..]
-            .graphemes(true)
-            .take(at)
-            .collect();
-        let remainder: String = self.string[..]
-            .graphemes(true)
-            .skip(at + 1)
-            .collect();
-        self.string = beginning;
-        self.update_len();
+        let mut row: String = String::new();
+        let mut length = 0;
+        let mut splitted_row: String = String::new();
+        let mut splitted_length = 0;
 
+        for (index, grapheme) in self
+            .string[..]
+            .graphemes(true)
+            .enumerate()
+        {
+            if index < at {
+                length += 1;
+                row.push_str(grapheme);
+            } else {
+                splitted_length += 1;
+                splitted_row.push_str(grapheme);
+            }
+        }
 
-        Self::from(&remainder[..])
+        self.string = row;
+        self.len = length;
+
+        Self {
+            string: splitted_row,
+            len: splitted_length,
+        }
     }
 
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.string.as_bytes()
-    }
-
-    fn update_len(&mut self) {
-        self.len = self.string[..].graphemes(true).count();
     }
 }
