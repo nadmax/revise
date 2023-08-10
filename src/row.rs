@@ -1,12 +1,15 @@
 use crate::SearchDirection;
+use crate::highlight;
 
 use std::cmp;
+use termion::color;
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Default)]
 pub struct Row {
     string: String,
     len: usize,
+    highlight: Vec<highlight::Type>,
 }
 
 impl From<&str> for Row {
@@ -14,6 +17,7 @@ impl From<&str> for Row {
         Self {
             string: String::from(slice),
             len: slice.graphemes(true).count(),
+            highlight: Vec::new(),
         }
     }
 }
@@ -24,18 +28,45 @@ impl Row {
         let end = cmp::min(end, self.string.len());
         let start = cmp::min(start, end);
         let mut result = String::new();
+        let mut current_highlight = &highlight::Type::None;
 
-        for grapheme in self.string[..]
+        for (index, grapheme) in self.string[..]
             .graphemes(true)
+            .enumerate()
             .skip(start)
             .take(end - start)
         {
-            if grapheme == "\t" {
-                result.push(' ');
-            } else {
-                result.push_str(grapheme);
+            if let Some(c) = grapheme.chars().next() {
+                let highlight_type = self
+                    .highlight
+                    .get(index)
+                    .unwrap_or(&highlight::Type::None);
+                
+                if highlight_type != current_highlight {
+                    current_highlight = highlight_type;
+                    
+                    let start_highlight = format!(
+                        "{}",
+                        color::Fg(highlight_type.to_color()),
+                    );
+                    
+                    result.push_str(&start_highlight[..]);
+                }
+
+                if c == '\t' {
+                    result.push(' ');
+                } else {
+                    result.push(c);
+                }
             }
         }
+        
+        let end_highlight = format!(
+            "{}",
+            color::Fg(color::Reset),
+        );
+
+        result.push_str(&end_highlight[..]);
 
         result
     }
@@ -136,6 +167,7 @@ impl Row {
         Self {
             string: splitted_row,
             len: splitted_length,
+            highlight: Vec::new(),
         }
     }
 
@@ -184,5 +216,62 @@ impl Row {
         }
 
         None
+    }
+
+    pub fn highlight(&mut self, word: Option<&str>) {
+        let mut highlight = Vec::new();
+        let chars: Vec<char> = self.string.chars().collect();
+        let mut matches = Vec::new();
+        let mut search_index = 0;
+
+        if let Some(word) = word {
+            while let Some(search_match) = self.find(word, search_index, SearchDirection::Forward) {
+                matches.push(search_match);
+
+                if let Some(next_index) = search_match.checked_add(word[..].graphemes(true).count()) {
+                    search_index = next_index;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        let mut prev_is_separator = true;
+        let mut index = 0;
+
+        while let Some(c) = chars.get(index) {
+            if let Some(word) = word {
+                if matches.contains(&index) {
+                    for _ in word[..].graphemes(true) {
+                        index += 1;
+                        highlight.push(highlight::Type::Match);
+                    }
+                }
+                
+                continue;
+            }
+
+            let previous_highlight = if index > 0 {
+                highlight
+                    .get(index - 1)
+                    .unwrap_or(&highlight::Type::None)
+            } else {
+                &highlight::Type::None
+            };
+            
+            if (c.is_ascii_digit() 
+                && (prev_is_separator || previous_highlight == &highlight::Type::Number)) 
+                || (c == &'.' && previous_highlight == &highlight::Type::Number)
+            {
+                highlight.push(highlight::Type::Number);
+            } else {
+                highlight.push(highlight::Type::None);
+            }
+
+            prev_is_separator = c.is_ascii_punctuation() || c.is_ascii_whitespace();
+            index += 1;
+        }
+
+        self.highlight = highlight;
     }
 }

@@ -3,6 +3,7 @@ mod editor;
 mod terminal;
 mod document;
 mod row;
+mod highlight;
 
 use editor::Editor;
 pub use terminal::Terminal;
