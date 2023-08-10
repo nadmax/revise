@@ -47,6 +47,7 @@ pub struct Editor {
     document: Document,
     status_message: StatusMessage,
     quit_times: u8,
+    highlighted_word: Option<String>,
 }
 
 impl Editor {
@@ -76,20 +77,21 @@ impl Editor {
             document,
             status_message: StatusMessage::from(initial_status),
             quit_times: QUIT_TIME,
+            highlighted_word: None,
         }
     }
 
     pub fn run(&mut self) {
         loop {
-            if let Err(error) = self.process_keypress() {
+            if let Err(error) = self.refresh_screen() {
                 die(&error);
             }
-
+            
             if self.should_quit {
                 break;
             }
-
-            if let Err(error) = self.refresh_screen() {
+            
+            if let Err(error) = self.process_keypress() {
                 die(&error);
             }
         }
@@ -98,7 +100,7 @@ impl Editor {
     pub fn draw_row(&self, row: &Row) {
         let start = self.offset.x;
         let width = self.terminal.size().width as usize;
-        let end = start + width;
+        let end = start.saturating_add(width);
         let row = row.render(start, end);
 
         println!("{row}\r");
@@ -109,7 +111,7 @@ impl Editor {
 
         match pressed_key {
             Key::Ctrl('q') => {
-                if self.quit_times > 0 && self.document.is_modified() {
+                if self.quit_times > 0 && self.document.is_changed() {
                     self.status_message = StatusMessage::from(format!(
                         "WARNING! File has unsaved changes. Press Ctrl-Q {} more time to quit.",
                         self.quit_times
@@ -154,14 +156,22 @@ impl Editor {
         Ok(())
     }
 
-    fn refresh_screen(&self) -> Result<(), Error> {
+    fn refresh_screen(&mut self) -> Result<(), Error> {
         Terminal::cursor_hide();
-        Terminal::cursor_position(&self.cursor_position);
+        Terminal::cursor_position(&Position::default());
         
         if self.should_quit {
             Terminal::clear_screen();
             println!("Goodbye!\r");
         } else {
+            self.document.highlight(
+                &self.highlighted_word,
+                Some(
+                    self.offset
+                        .y
+                        .saturating_add(self.terminal.size().height as usize),
+                ),
+            );
             self.draw_rows();
             self.draw_status_bar();
             self.draw_message_bar();
@@ -181,7 +191,10 @@ impl Editor {
         for terminal_row in 0..height {
             Terminal::clear_current_line();
             
-            if let Some(row) = self.document.row(terminal_row as usize + self.offset.y) {
+            if let Some(row) = self
+                .document
+                .row(self.offset.y.saturating_add(terminal_row as usize)) 
+            {
                 self.draw_row(row);
             } else if self.document.is_empty() && terminal_row == height / 3 {
                 self.draw_welcome_message();        
@@ -192,12 +205,12 @@ impl Editor {
     }
     
     fn draw_welcome_message(&self) {
-        let mut welcome_message = format!("Editor -- version{VERSION}\r");
+        let mut welcome_message = format!("Editor -- version {VERSION}");
         let width = self.terminal.size().width as usize;
         let len = welcome_message.len();
         let padding = width.saturating_sub(len) / 2;
-        let spaces = "".repeat(padding.saturating_sub(1));
-
+        let spaces = " ".repeat(padding.saturating_sub(1));
+    
         welcome_message = format!("~{spaces}{welcome_message}");
         welcome_message.truncate(width);
         
@@ -244,14 +257,14 @@ impl Editor {
             }
             Key::PageUp => {
                 y = if y > terminal_height {
-                    y - terminal_height
+                    y.saturating_sub(terminal_height)
                 } else {
                     0
                 }
             },
             Key::PageDown => {
                 y = if y.saturating_add(terminal_height) < height {
-                    y + terminal_height
+                    y.saturating_add(terminal_height)
                 } else {
                     height
                 }
@@ -294,15 +307,14 @@ impl Editor {
     }
 
     fn draw_status_bar(&self) {
-        let len = self.document.len();
         let mut status;
         let width = self.terminal.size().width as usize;
-        let modified_indicator = if self.document.is_modified() {
-            " (modified)"
+        let changed_indicator = if self.document.is_changed() {
+            " (changed)"
         } else {
             ""
         };
-        let mut filename = "[No Name]".to_string();
+        let mut filename = "[No Name]".to_owned();
 
         if let Some(name) = &self.document.filename {
             filename = name.clone();
@@ -310,22 +322,22 @@ impl Editor {
         }
         
         status = format!(
-            "{filename} - {len} lines{modified_indicator}", 
+            "{filename} - {} lines{changed_indicator}",
+            self.document.len(), 
         );
         let line_indicator = format!(
-            "{}/{len}",
+            "{} | {}/{}",
+            self.document.file_type(),
             self.cursor_position.y.saturating_add(1),
+            self.document.len(),
         );
         let len = status.len() + line_indicator.len();
 
-        if width > len {
-            status.push_str(&" ".repeat(width - len));
-        }
-
+        status.push_str(&" ".repeat(width.saturating_sub(len)));
         status = format!("{status}{line_indicator}");
         status.truncate(width);
-        Terminal::set_fg_color(STATUS_FG_COLOR);
         Terminal::set_bg_color(STATUS_BG_COLOR);
+        Terminal::set_fg_color(STATUS_FG_COLOR);
         println!("{status}\r");
         Terminal::reset_fg_color();
         Terminal::reset_bg_color();
@@ -356,11 +368,7 @@ impl Editor {
             let key = Terminal::read_key()?;
 
             match key {
-                Key::Backspace => {
-                    if !result.is_empty() {
-                        result.truncate(result.len() - 1);
-                    }
-                },
+                Key::Backspace => result.truncate(result.len().saturating_sub(1)),
                 Key::Char('\n') => break,
                 Key::Char(c) => {
                     if !c.is_control() {
@@ -391,16 +399,16 @@ impl Editor {
                 .prompt("Save as: ", |_, _, _| {}).unwrap_or(None);
 
             if new_name.is_none() {
-                self.status_message = StatusMessage::from("Save aborted.".to_string());
+                self.status_message = StatusMessage::from("Save aborted.".to_owned());
                 return;
             }
             self.document.filename = new_name;
         }
 
         if self.document.save().is_ok() {
-            self.status_message = StatusMessage::from("File saved successfully.".to_string());
+            self.status_message = StatusMessage::from("File saved successfully.".to_owned());
         } else {
-            self.status_message = StatusMessage::from("Error writing file!".to_string());
+            self.status_message = StatusMessage::from("Error writing file!".to_owned());
         }
     }
 
@@ -431,12 +439,16 @@ impl Editor {
                 } else if moved {
                     editor.move_cursor(Key::Left);
                 }
+
+                editor.highlighted_word = Some(query.to_owned());
             }).unwrap_or(None);
 
         if query.is_none() {
             self.cursor_position = old_position;
             self.scroll();
         }
+
+        self.highlighted_word = None;
     }
 }
 

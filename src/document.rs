@@ -1,16 +1,17 @@
 use crate::Row;
 use crate::Position;
 use crate::SearchDirection;
+use crate::FileType;
 
 use std::fs::{File, read_to_string};
 use std::io::{Error, Write};
-use std::cmp::Ordering;
 
 #[derive(Default)]
 pub struct Document {
     rows: Vec<Row>,
     pub filename: Option<String>,
-    modified: bool,
+    changed: bool,
+    file_type: FileType,
 }
 
 impl Document {
@@ -19,19 +20,18 @@ impl Document {
     /// Will return `Error` if it fails read filename
     pub fn open(filename: &str) -> Result<Self, Error> {
         let contents = read_to_string(filename)?;
+        let file_type = FileType::from(filename);
         let mut rows = Vec::new();
 
         for value in contents.lines() {
-            let mut row = Row::from(value);
-
-            row.highlight(None);
-            rows.push(row);
+            rows.push(Row::from(value));
         }
 
         Ok(Self {
             rows,
-            filename: Some(filename.to_string()),
-            modified: false
+            filename: Some(filename.to_owned()),
+            changed: false,
+            file_type: file_type,
         })
     }
 
@@ -54,30 +54,25 @@ impl Document {
     /// 
     /// Will panic if there is no row to insert
     pub fn insert(&mut self, at: &Position, c: char) {
-        let len = self.len();
+        if at.y > self.rows.len() {
+            return;
+        }
+        
+        self.changed = true;
         
         if c == '\n' {
             self.insert_newline(at);
-
-            return;
+        } else if at.y == self.rows.len() {
+            let mut row = Row::default();
+            row.insert(0, c);
+            self.rows.push(row);
+        } else {
+            #[allow(clippy::indexing_slicing)]
+            let row = &mut self.rows[at.y];
+            row.insert(at.x, c);
         }
 
-        match at.y.cmp(&len) {
-            Ordering::Equal => {
-                let mut row = Row::default();
-        
-                row.insert(0, c);
-                self.rows.push(row);
-            },
-            Ordering::Less => {
-                let row = self.rows.get_mut(at.y).unwrap();
-                
-                row.insert(at.x, c);
-            },
-            Ordering::Greater => (),
-        }
-
-        self.modified = true;
+        self.unhighlight_rows(at.y);
     }
 
     /// # Panics
@@ -90,24 +85,20 @@ impl Document {
             return;
         }
 
-        self.modified = true;
+        self.changed = true;
 
         if at.x == self.rows.get_mut(at.y).unwrap().len() && at.y < len - 1 {
             let next_row = self.rows.remove(at.y + 1);
-            let row = self.rows.get_mut(at.y).unwrap();
+            let row = &mut self.rows[at.y];
 
             row.append(&next_row);
-            row.highlight(None);
         } else {
-            let row = self.rows.get_mut(at.y).unwrap();
+            let row = &mut self.rows[at.y];
 
             row.delete(at.x);
-            row.highlight(None);
         }
 
-        let row = self.rows.get_mut(at.y).unwrap();
-
-        row.delete(at.x);
+        self.unhighlight_rows(at.y);
     }
 
 
@@ -117,21 +108,22 @@ impl Document {
     pub fn save(&mut self) -> Result<(), Error> {
         if let Some(filename) = &self.filename {
             let mut file = File::create(filename)?;
+            self.file_type = FileType::from(filename);
 
-            for row in &self.rows {
+            for row in &mut self.rows {
                 file.write_all(row.as_bytes())?;
                 file.write_all(b"\n")?;
             }
 
-            self.modified = false;
+            self.changed = false;
         }
 
         Ok(())
     }
 
     #[must_use]
-    pub fn is_modified(&self) -> bool {
-        self.modified
+    pub fn is_changed(&self) -> bool {
+        self.changed
     }
 
     #[must_use]
@@ -174,26 +166,53 @@ impl Document {
         None
     }
 
-    pub fn highlight(&mut self, word: Option<&str>) {
-        for row in &mut self.rows {
-            row.highlight(word);
+    pub fn highlight(&mut self, word: &Option<String>, until: Option<usize>) {
+        let mut start_with_comment = false;
+        let len = self.rows.len();
+        let until = if let Some(until) = until {
+            if until.saturating_add(1) < len {
+                until.saturating_add(1)
+            } else {
+                len
+            }
+        } else {
+            len
+        };
+
+        for row in &mut self.rows[..until] {
+            start_with_comment = row.highlight(
+                &self.file_type.highlight_options(), 
+                word, 
+                start_with_comment,
+            );
         }
     }
 
+    pub fn file_type(&self) -> String {
+        self.file_type.name()
+    }
+
     fn insert_newline(&mut self, at: &Position) {
-        let len = self.rows.len();
-        
-        match at.y.cmp(&len) {
-            Ordering::Greater => (),
-            Ordering::Equal => self.rows.push(Row::default()),
-            Ordering::Less => {
-                let current_row = &mut self.rows[at.y];
-                let mut new_row = current_row.split(at.x);
-        
-                current_row.highlight(None);
-                new_row.highlight(None);
-                self.rows.insert(at.y + 1, new_row);
-            },
+        if at.y > self.rows.len() {
+            return;
+        }
+
+        if at.y == self.rows.len() {
+            self.rows.push(Row::default());
+            return;
+        }
+
+        let current_row = &mut self.rows[at.y];
+        let new_row = current_row.split(at.x);
+
+        self.rows.insert(at.y + 1, new_row);
+    }
+
+    fn unhighlight_rows(&mut self, start: usize) {
+        let start = start.saturating_sub(1);
+
+        for row in self.rows.iter_mut().skip(start) {
+            row.is_highlighted = false;
         }
     }
 }
