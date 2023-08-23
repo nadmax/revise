@@ -273,7 +273,7 @@ impl Row {
 
             if self.highlight_char(&mut index, opts, *c, &chars) 
                 || self.highlight_comment(&mut index, opts, *c, &chars) 
-                || self.highlight_primary_keywords(&mut index, &opts, &chars) 
+                || self.highlight_primary_keywords(&mut index, opts, &chars) 
                 || self.highlight_secondary_keywords(&mut index, opts, &chars) 
                 || self.highlight_string(&mut index, opts, *c, &chars) 
                 || self.highlight_number(&mut index, opts, *c, &chars)
@@ -487,7 +487,7 @@ impl Row {
                 }
             }
 
-            if self.highlight_str(index, &word, chars, hl_type) {
+            if self.highlight_str(index, word, chars, hl_type) {
                 return true;
             }
         }
@@ -504,7 +504,7 @@ impl Row {
         self.highlight_keywords(
             index,
             chars,
-            &opts.primary_keywords(),
+            opts.primary_keywords(),
             highlight::Type::PrimaryKeywords,
         )
     }
@@ -518,7 +518,7 @@ impl Row {
         self.highlight_keywords(
             index,
             chars,
-            &opts.primary_keywords(),
+            opts.primary_keywords(),
             highlight::Type::SecondaryKeywords,
         )
     }

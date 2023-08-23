@@ -1,4 +1,4 @@
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all)]
 mod editor;
 mod terminal;
 mod document;

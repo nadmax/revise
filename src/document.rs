@@ -31,7 +31,7 @@ impl Document {
             rows,
             filename: Some(filename.to_owned()),
             changed: false,
-            file_type: file_type,
+            file_type,
         })
     }
 
@@ -181,7 +181,7 @@ impl Document {
 
         for row in &mut self.rows[..until] {
             start_with_comment = row.highlight(
-                &self.file_type.highlight_options(), 
+                self.file_type.highlight_options(), 
                 word, 
                 start_with_comment,
             );
