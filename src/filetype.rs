@@ -1,3 +1,5 @@
+use std::path::Path;
+
 #[derive(Default)]
 pub struct HighlightOptions {
     numbers: bool,
@@ -59,7 +61,9 @@ impl FileType {
     }
 
     pub fn from(filename: &str) -> Self {
-        if filename.ends_with(".rs") {
+        if Path::new(filename)
+            .extension()
+            .map_or(false, |ext| ext.eq_ignore_ascii_case("rs")) {
             return Self {
                 name: String::from("Rust"),
                 hl_opts: HighlightOptions { 
