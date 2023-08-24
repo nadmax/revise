@@ -216,3 +216,22 @@ impl Document {
         }
     }
 }
+
+#[cfg(test)]
+mod document_tests {
+    use super::*;
+
+    #[test]
+    fn test_save() {
+        let mut new_doc = Document {
+            filename: Some("test.txt".to_owned()),
+            .. Document::default()
+        };
+        let save_res = new_doc.save();
+
+        assert_eq!(
+            save_res.ok(),
+            Some(()),
+        );
+    }
+}
