@@ -26,6 +26,23 @@ jobs:
       - name: Run Clippy
         run: |
           cargo clippy --all-targets --all-features
+  
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+    
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: Run Test
+        run: |
+          cargo test
+    
 
   build:
     runs-on: ubuntu-latest

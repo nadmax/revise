@@ -557,3 +557,45 @@ impl Row {
 fn is_separator(c: char) -> bool {
     c.is_ascii_punctuation() || c.is_ascii_whitespace()
 }
+
+#[cfg(test)]
+mod row_tests {
+    use super::*;
+
+    #[test]
+    fn test_find() {
+        let row = Row::from("test123");
+
+        assert_eq!(row.find("t", 0, SearchDirection::Forward), Some(0));
+        assert_eq!(row.find("t", 2, SearchDirection::Forward), Some(3));
+        assert_eq!(row.find("t", 5, SearchDirection::Forward), None);
+    }
+
+    #[test]
+    fn test_highlight_match() {
+        let mut row = Row::from("test123");
+
+        row.highlight = vec![
+            highlight::Type::Char,
+            highlight::Type::Char,
+            highlight::Type::Char,
+            highlight::Type::Char,
+            highlight::Type::Number,
+            highlight::Type::Number,
+            highlight::Type::Number,
+        ];
+        row.highlight_match(&Some("t".to_string()));
+        assert_eq!(
+            vec![
+                highlight::Type::Match,
+                highlight::Type::Char,
+                highlight::Type::Char,
+                highlight::Type::Char,
+                highlight::Type::Number,
+                highlight::Type::Number,
+                highlight::Type::Number,
+            ],
+            row.highlight
+        )
+    }
+}
