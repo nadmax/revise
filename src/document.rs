@@ -222,6 +222,16 @@ mod document_tests {
     use super::*;
 
     #[test]
+    fn test_open() {
+        let doc1 = Document::open("Cargo.toml");
+        let doc2 = Document::open("lol.txt");
+
+        assert!(doc1.is_ok());
+        assert!(doc2.is_err());
+
+    }
+
+    #[test]
     fn test_save() {
         let mut new_doc = Document {
             filename: Some("test.txt".to_owned()),
@@ -233,5 +243,20 @@ mod document_tests {
             save_res.ok(),
             Some(()),
         );
+    }
+
+    #[test]
+    fn test_unhighlight_words() {
+        let open_doc = Document::open("Cargo.toml");
+        let mut doc = open_doc.unwrap();
+
+        doc.unhighlight_rows(1);
+
+        let row = doc.row(1).unwrap();
+
+        assert_ne!(
+            row.is_highlighted,
+            true,
+        )
     }
 }
