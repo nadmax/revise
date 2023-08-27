@@ -1,0 +1,31 @@
+name: coverage
+
+on:
+  push:
+    branches:
+    -  master
+  pull_request:
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+    
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      
+      - name: Install Tarpaulin
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+            version: '0.15.0'
+            args: '-- --test-threads 1'
+
+      - name: Coverage
+        run: |
+          cargo tarpaulin --coveralls ${{ secrets.COVERALLS_TOKEN }}
