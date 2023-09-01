@@ -106,22 +106,12 @@ impl Editor {
         println!("{row}\r");
     }
 
+
     fn process_keypress(&mut self) -> Result<(), Error> {
         let pressed_key = Terminal::read_key()?;
 
         match pressed_key {
-            Key::Ctrl('q') => {
-                if self.quit_times > 0 && self.document.is_changed() {
-                    self.status_message = StatusMessage::from(format!(
-                        "WARNING! File has unsaved changes. Press Ctrl-Q {} more time to quit.",
-                        self.quit_times
-                    ));
-                    self.quit_times -= 1;
-
-                    return Ok(());
-                }
-                self.should_quit = true;
-            },
+            Key::Ctrl('q') => return self.quit(),
             Key::Ctrl('s') => self.save(),
             Key::Ctrl('f') => self.search(),
             Key::Char(c) => {
@@ -152,6 +142,21 @@ impl Editor {
             self.quit_times = QUIT_TIME;
             self.status_message = StatusMessage::from(String::new());
         }
+
+        Ok(())
+    }
+
+    fn quit(&mut self) -> Result<(), Error> {
+        if self.quit_times > 0 && self.document.is_changed() {
+            self.status_message = StatusMessage::from(format!(
+                "WARNING! File has unsaved changes. Press Ctrl-Q {} more time to quit.",
+                self.quit_times
+            ));
+            self.quit_times -= 1;
+
+            return Ok(());
+        }
+        self.should_quit = true;
 
         Ok(())
     }
