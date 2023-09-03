@@ -1,12 +1,15 @@
 use crate::Terminal;
 use crate::Document;
 use crate::Row;
+use crate::CopyError;
 
-use std::io::Error;
+use std::error::Error;
+use std::io::Error as IOError;
 use std::env;
 use std::time::{Duration, Instant};
 use termion::event::Key;
 use termion::color;
+use cli_clipboard::{ClipboardContext, ClipboardProvider};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
@@ -48,6 +51,7 @@ pub struct Editor {
     status_message: StatusMessage,
     quit_times: u8,
     highlighted_word: Option<String>,
+    clipboard: ClipboardContext,
 }
 
 impl Editor {
@@ -78,6 +82,7 @@ impl Editor {
             status_message: StatusMessage::from(initial_status),
             quit_times: QUIT_TIME,
             highlighted_word: None,
+            clipboard: ClipboardContext::new().expect("Failed to initialize clipboard"),
         }
     }
 
@@ -107,10 +112,30 @@ impl Editor {
     }
 
 
-    fn process_keypress(&mut self) -> Result<(), Error> {
+    fn process_keypress(&mut self) -> Result<(), IOError> {
         let pressed_key = Terminal::read_key()?;
 
         match pressed_key {
+            Key::Ctrl('c') => {
+                match self.copy_content() {
+                    Ok(_) => (),
+                    Err(err) => self.status_message = StatusMessage::from(
+                        format!("Failed to copy content: {err}")
+                    ),
+                }
+            },
+            Key::Ctrl('v') => {
+                match self.paste_content() {
+                    Ok(v) => {
+                        for c in v.chars().rev() {
+                            self.document.insert(&self.cursor_position, c);
+                        }
+                    },
+                    Err(err) => self.status_message = StatusMessage::from(
+                        format!("Failed to paste content: {err}")
+                    ),
+                }
+            }
             Key::Ctrl('q') => return self.quit(),
             Key::Ctrl('s') => self.save(),
             Key::Ctrl('f') => self.search(),
@@ -146,7 +171,7 @@ impl Editor {
         Ok(())
     }
 
-    fn quit(&mut self) -> Result<(), Error> {
+    fn quit(&mut self) -> Result<(), IOError> {
         if self.quit_times > 0 && self.document.is_changed() {
             self.status_message = StatusMessage::from(format!(
                 "WARNING! File has unsaved changes. Press Ctrl-Q {} more time to quit.",
@@ -161,7 +186,7 @@ impl Editor {
         Ok(())
     }
 
-    fn refresh_screen(&mut self) -> Result<(), Error> {
+    fn refresh_screen(&mut self) -> Result<(), IOError> {
         Terminal::cursor_hide();
         Terminal::cursor_position(&Position::default());
         
@@ -360,7 +385,7 @@ impl Editor {
         }
     }
 
-    fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, Error> 
+    fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, IOError> 
     where
         C: FnMut(&mut Self, Key, &String),
     {
@@ -455,9 +480,34 @@ impl Editor {
 
         self.highlighted_word = None;
     }
+
+    fn copy_content(&mut self) -> Result<(), Box<dyn Error>> {
+        let row = self.document.row(self.cursor_position.y);
+
+        match row{
+            Some(v) => self.clipboard.set_contents(v.as_string().to_owned()),
+            None => return Err(Box::new(CopyError("content was empty".to_owned()))),
+        }
+    }
+
+    fn paste_content(&mut self) -> Result<String, Box<dyn Error>> {
+        let content = self.clipboard.get_contents();
+
+        match content {
+            Ok(mut v) => {
+                if v.len() == 0 {
+                    v = String::from(" ");
+                    self.cursor_position.y = self.cursor_position.y.saturating_add(1);
+                }
+
+                Ok(v)
+            },
+            Err(err) => return Err(err),
+        }
+    }
 }
 
-fn die(err: &Error) {
+fn die(err: &IOError) {
     Terminal::clear_screen();
 
     panic!("{}", err)

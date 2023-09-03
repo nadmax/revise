@@ -296,6 +296,10 @@ impl Row {
         false
     }
 
+    pub fn as_string(&self) -> &String {
+        &self.string
+    }
+
     fn highlight_match(&mut self, word: &Option<String>) {
         if let Some(word) = word {
             if word.is_empty() {
