@@ -43,7 +43,7 @@ impl Row {
                 let highlight_type = self
                     .highlight
                     .get(index)
-                    .unwrap_or_else(|| &highlight::Type::None);
+                    .unwrap_or(current_highlight);
 
                 if highlight_type != current_highlight {
                     current_highlight = highlight_type;

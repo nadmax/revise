@@ -499,7 +499,7 @@ impl Editor {
 
         match row{
             Some(v) => self.clipboard.set_contents(v.as_string().to_owned()),
-            None => return Err(Box::new(CopyError("content was empty".to_owned()))),
+            None => Err(Box::new(CopyError("content was empty".to_owned()))),
         }
     }
 
@@ -508,14 +508,14 @@ impl Editor {
 
         match content {
             Ok(mut v) => {
-                if v.len() == 0 {
+                if v.is_empty() {
                     v = String::from(" ");
                     self.cursor_position.y = self.cursor_position.y.saturating_add(1);
                 }
 
                 Ok(v)
             },
-            Err(err) => return Err(err),
+            Err(err) => Err(err),
         }
     }
 }
