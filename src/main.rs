@@ -11,7 +11,7 @@ use editor::Editor;
 pub use terminal::Terminal;
 pub use editor::Position;
 pub use editor::SearchDirection;
-pub use error::content_error::CopyError;
+pub use error::errors::{CopyError, RowDeletionError};
 pub use document::Document;
 pub use row::Row;
 pub use filetype::FileType;
