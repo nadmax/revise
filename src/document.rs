@@ -2,9 +2,11 @@ use crate::Row;
 use crate::Position;
 use crate::SearchDirection;
 use crate::FileType;
+use crate::RowDeletionError;
 
+use std::error::Error;
 use std::fs::{File, read_to_string};
-use std::io::{Error, Write};
+use std::io::{Error as IOError, Write};
 
 #[derive(Default)]
 pub struct Document {
@@ -18,7 +20,7 @@ impl Document {
     /// # Errors
     /// 
     /// Will return `Error` if it fails read filename
-    pub fn open(filename: &str) -> Result<Self, Error> {
+    pub fn open(filename: &str) -> Result<Self, IOError> {
         let contents = read_to_string(filename)?;
         let file_type = FileType::from(filename);
         let mut rows = Vec::new();
@@ -75,37 +77,47 @@ impl Document {
         self.unhighlight_rows(at.y);
     }
 
-    /// # Panics
+    /// # Errors
     /// 
-    /// Will panic if there is no row to delete
-    pub fn delete(&mut self, at: &Position) {
+    /// Will return `Error` if it fails to get the row to delete
+    pub fn delete(&mut self, at: &Position) -> Result<(), Box<dyn Error>> {
         let len = self.len();
 
         if at.y >= len {
-            return;
+            ()
         }
 
         self.changed = true;
+        let row = self.rows.get_mut(at.y);
 
-        if at.x == self.rows.get_mut(at.y).unwrap().len() && at.y < len - 1 {
-            let next_row = self.rows.remove(at.y + 1);
-            let row = &mut self.rows[at.y];
+        match row {
+            Some(r) => {
+                if at.x == r.len() && at.y < len - 1 {
+                    let next_row = self.rows.remove(at.y + 1);
+                    let row = &mut self.rows[at.y];
+        
+                    row.append(&next_row);
+                } else {
+                    let row = &mut self.rows[at.y];
+        
+                    row.delete(at.x);
+                }
 
-            row.append(&next_row);
-        } else {
-            let row = &mut self.rows[at.y];
-
-            row.delete(at.x);
+            },
+            None => return Err(Box::new(RowDeletionError(at.x, at.y)))
         }
-
+        
         self.unhighlight_rows(at.y);
+        
+        Ok(())
+
     }
 
 
     /// # Errors
     /// 
     /// Will return `Error` if it fails to create a file to save
-    pub fn save(&mut self) -> Result<(), Error> {
+    pub fn save(&mut self) -> Result<(), IOError> {
         if let Some(filename) = &self.filename {
             let mut file = File::create(filename)?;
             self.file_type = FileType::from(filename);

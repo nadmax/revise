@@ -143,11 +143,24 @@ impl Editor {
                 self.document.insert(&self.cursor_position, c);
                 self.move_cursor(Key::Right);
             },
-            Key::Delete => self.document.delete(&self.cursor_position),
+            Key::Delete => {
+                match self.document.delete(&self.cursor_position) {
+                    Ok(_) => (),
+                    Err(err) => self.status_message = StatusMessage::from(
+                        format!("Failed to remove content: {err}")
+                    ),
+                }
+            },
             Key::Backspace => {
                 if self.cursor_position.x > 0 || self.cursor_position.y > 0 {
                     self.move_cursor(Key::Left);
-                    self.document.delete(&self.cursor_position);
+
+                    match self.document.delete(&self.cursor_position) {
+                        Ok(_) => (),
+                        Err(err) => self.status_message = StatusMessage::from(
+                            format!("Failed to remove character: {err}")
+                        ),
+                    }
                 }
             },
             Key::Up 
@@ -426,7 +439,7 @@ impl Editor {
     fn save(&mut self) {
         if self.document.filename.is_none() {
             let new_name = self
-                .prompt("Save as: ", |_, _, _| {}).unwrap_or(None);
+                .prompt("Save as: ", |_, _, _| {}).unwrap_or_default();
 
             if new_name.is_none() {
                 self.status_message = StatusMessage::from("Save aborted.".to_owned());
@@ -471,7 +484,7 @@ impl Editor {
                 }
 
                 editor.highlighted_word = Some(query.to_owned());
-            }).unwrap_or(None);
+            }).unwrap_or_default();
 
         if query.is_none() {
             self.cursor_position = old_position;
