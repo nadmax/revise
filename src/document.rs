@@ -84,7 +84,7 @@ impl Document {
         let len = self.len();
 
         if at.y >= len {
-            ()
+            return Ok(());
         }
 
         self.changed = true;
@@ -102,15 +102,13 @@ impl Document {
         
                     row.delete(at.x);
                 }
+                
+                self.unhighlight_rows(at.y);
 
+                Ok(())
             },
-            None => return Err(Box::new(RowDeletionError(at.x, at.y)))
+            None => Err(Box::new(RowDeletionError(at.x, at.y)))
         }
-        
-        self.unhighlight_rows(at.y);
-        
-        Ok(())
-
     }
 
 
