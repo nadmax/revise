@@ -4,7 +4,7 @@
 
 A simple text editor written in Rust.
 
-![Editor example](static/editor.png)
+![Editor example](https://github.com/nadmax/editor/blob/master/static/editor.png)
 
 ## Prerequisites
 
