@@ -205,7 +205,6 @@ impl Editor {
         
         if self.should_quit {
             Terminal::clear_screen();
-            println!("Goodbye!\r");
         } else {
             self.document.highlight(
                 &self.highlighted_word,
