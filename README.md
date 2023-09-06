@@ -16,3 +16,7 @@ See [Installation Guide](https://www.rust-lang.org/tools/install)
 ```bash
 cargo run [FILE]
 ```
+
+## Contributing
+See [Contributing Section](https://github.com/nadmax/editor/blob/master/CONTRIBUTING.md) to find out how you can contribute.  
+Any feedback will be appreciated.
