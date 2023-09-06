@@ -8,4 +8,5 @@ add syntax highlighting ✅
 update .gitignore ✅
 fix ❌
 remove warnings to make clippy green ❌
+fix up and left arrows usage while searching a keyword ✅
 ```
