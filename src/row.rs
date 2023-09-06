@@ -477,6 +477,7 @@ impl Row {
     ) -> bool {
         if *index > 0 {
             let prev_char = chars[*index - 1];
+
             if !is_separator(prev_char) {
                 return false;
             }
@@ -522,7 +523,7 @@ impl Row {
         self.highlight_keywords(
             index,
             chars,
-            opts.primary_keywords(),
+            opts.secondary_keywords(),
             highlight::Type::SecondaryKeywords,
         )
     }
