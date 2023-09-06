@@ -59,9 +59,9 @@ impl Document {
         if at.y > self.rows.len() {
             return;
         }
-        
+
         self.changed = true;
-        
+
         if c == '\n' {
             self.insert_newline(at);
         } else if at.y == self.rows.len() {
@@ -95,14 +95,14 @@ impl Document {
                 if at.x == r.len() && at.y < len - 1 {
                     let next_row = self.rows.remove(at.y + 1);
                     let row = &mut self.rows[at.y];
-        
+
                     row.append(&next_row);
                 } else {
                     let row = &mut self.rows[at.y];
-        
+
                     row.delete(at.x);
                 }
-                
+
                 self.unhighlight_rows(at.y);
 
                 Ok(())
@@ -110,7 +110,6 @@ impl Document {
             None => Err(Box::new(RowDeletionError(at.x, at.y)))
         }
     }
-
 
     /// # Errors
     /// 
@@ -161,7 +160,7 @@ impl Document {
 
                     return Some(position);
                 }
-                
+
                 if direction == SearchDirection::Forward {
                     position.y = position.y.saturating_add(1);
                     position.x = 0;

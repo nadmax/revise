@@ -63,7 +63,7 @@ impl Row {
                 }
             }
         }
-        
+
         let end_highlight = format!(
             "{}",
             color::Fg(color::Reset),
@@ -91,7 +91,7 @@ impl Row {
 
             return;
         }
-        
+
         let mut result: String = String::new();
         let mut length = 0;
 
@@ -106,7 +106,7 @@ impl Row {
                 length += 1;
                 result.push(c);
             }
-            
+
             result.push_str(grapheme);
         }
 
@@ -231,7 +231,6 @@ impl Row {
         let len = self.string.len();
         let chars: Vec<char> = self.string.chars().collect();
 
-
         if self.is_highlighted && word.is_none() {
             if let Some(hl_type) = self.highlight.last() {
                 if *hl_type == highlight::Type::MultilineComment 
@@ -265,10 +264,10 @@ impl Row {
         while let Some(c) = chars.get(index) {
             if self.highlight_multiline_comment(&mut index, opts, *c, &chars) {
                 in_ml_comment = true;
-                
+
                 continue;
             }
-            
+
             in_ml_comment = false;
 
             if self.highlight_char(&mut index, opts, *c, &chars) 
@@ -305,8 +304,9 @@ impl Row {
             if word.is_empty() {
                 return;
             }
+
             let mut index = 0;
-    
+
             while let Some(search_match) = self.find(word, index, SearchDirection::Forward) {
                 if let Some(next_index) = search_match.checked_add(
                     word[..].graphemes(true).count(),
@@ -314,7 +314,7 @@ impl Row {
                     for i in index.saturating_add(search_match)..next_index {
                         self.highlight[i] = highlight::Type::Match;
                     }
-    
+
                     index = next_index;
                 } else {
                     break;
@@ -447,7 +447,7 @@ impl Row {
         if opts.numbers() && c.is_ascii_digit() {
             if *index > 0 {
                 let prev_char = chars[*index - 1];
-                
+
                 if !is_separator(prev_char) {
                     return false;
                 }
@@ -543,7 +543,7 @@ impl Row {
                         } else {
                             chars.len()
                         };
-                    
+
                     for _ in *index..closing_index {
                         self.highlight.push(highlight::Type::MultilineComment);
                         *index += 1;

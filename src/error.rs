@@ -15,7 +15,7 @@ pub mod errors {
             write!(f, "{}", self.0)
         }
     }
-    
+
     impl Error for CopyError {}
 
     impl Display for RowDeletionError {

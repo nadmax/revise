@@ -91,11 +91,11 @@ impl Editor {
             if let Err(error) = self.refresh_screen() {
                 die(&error);
             }
-            
+
             if self.should_quit {
                 break;
             }
-            
+
             if let Err(error) = self.process_keypress() {
                 die(&error);
             }
@@ -110,7 +110,6 @@ impl Editor {
 
         println!("{row}\r");
     }
-
 
     fn process_keypress(&mut self) -> Result<(), IOError> {
         let pressed_key = Terminal::read_key()?;
@@ -202,7 +201,7 @@ impl Editor {
     fn refresh_screen(&mut self) -> Result<(), IOError> {
         Terminal::cursor_hide();
         Terminal::cursor_position(&Position::default());
-        
+
         if self.should_quit {
             Terminal::clear_screen();
         } else {
@@ -232,7 +231,7 @@ impl Editor {
 
         for terminal_row in 0..height {
             Terminal::clear_current_line();
-            
+
             if let Some(row) = self
                 .document
                 .row(self.offset.y.saturating_add(terminal_row as usize)) 
@@ -245,17 +244,17 @@ impl Editor {
             }
         }
     }
-    
+
     fn draw_welcome_message(&self) {
         let mut welcome_message = format!("Editor -- version {VERSION}");
         let width = self.terminal.size().width as usize;
         let len = welcome_message.len();
         let padding = width.saturating_sub(len) / 2;
         let spaces = " ".repeat(padding.saturating_sub(1));
-    
+
         welcome_message = format!("~{spaces}{welcome_message}");
         welcome_message.truncate(width);
-        
+
         println!("{welcome_message}\r");
     }
 
@@ -281,7 +280,7 @@ impl Editor {
                     x -= 1;
                 } else if y > 0 {
                     y -= 1;
-                    
+
                     if let Some(row) = self.document.row(y) {
                         x = row.len();
                     } else {
@@ -362,7 +361,7 @@ impl Editor {
             filename = name.clone();
             filename.truncate(20);
         }
-        
+
         status = format!(
             "{filename} - {} lines{changed_indicator}",
             self.document.len(), 
