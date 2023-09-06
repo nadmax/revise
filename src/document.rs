@@ -161,11 +161,12 @@ impl Document {
 
                     return Some(position);
                 }
+                
                 if direction == SearchDirection::Forward {
                     position.y = position.y.saturating_add(1);
                     position.x = 0;
                 } else {
-                    position.y = position.y.saturating_add(1);
+                    position.y = position.y.saturating_sub(1);
                     position.x = self.rows[position.y].len();
                 }
             } else {
