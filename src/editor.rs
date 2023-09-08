@@ -4,8 +4,9 @@ use crate::Row;
 use crate::CopyError;
 
 use std::error::Error;
-use std::io::Error as IOError;
+use std::io::{Error as IOError, ErrorKind};
 use std::env;
+use std::str;
 use std::time::{Duration, Instant};
 use termion::event::Key;
 use termion::color;
@@ -29,15 +30,15 @@ pub struct Position {
 }
 
 struct StatusMessage {
-    text: String,
+    text: Vec<u8>,
     time: Instant,
 }
 
 impl StatusMessage {
-    fn from(message: String) -> Self {
+    fn from(message: &[u8]) -> Self {
         Self {
             time: Instant::now(),
-            text: message,
+            text: message.to_vec(),
         }
     }
 }
@@ -50,7 +51,7 @@ pub struct Editor {
     document: Document,
     status_message: StatusMessage,
     quit_times: u8,
-    highlighted_word: Option<String>,
+    highlighted_word: Option<Vec<u8>>,
     clipboard: ClipboardContext,
 }
 
@@ -79,7 +80,7 @@ impl Editor {
             cursor_position: Position::default(),
             offset: Position::default(),
             document,
-            status_message: StatusMessage::from(initial_status),
+            status_message: StatusMessage::from(initial_status.as_bytes()),
             quit_times: QUIT_TIME,
             highlighted_word: None,
             clipboard: ClipboardContext::new().expect("Failed to initialize clipboard"),
@@ -102,13 +103,10 @@ impl Editor {
         }
     }
 
-    pub fn draw_row(&self, row: &Row) {
-        let start = self.offset.x;
-        let width = self.terminal.size().width as usize;
-        let end = start.saturating_add(width);
-        let row = row.render(start, end);
+    pub fn draw_row(&mut self, row: &Row) {
+        let new_row = row.render();
 
-        println!("{row}\r");
+        self.terminal.write(&new_row);
     }
 
     fn process_keypress(&mut self) -> Result<(), IOError> {
@@ -119,19 +117,17 @@ impl Editor {
                 match self.copy_content() {
                     Ok(_) => (),
                     Err(err) => self.status_message = StatusMessage::from(
-                        format!("Failed to copy content: {err}")
+                        format!("Failed to copy content: {err}").as_bytes()
                     ),
                 }
             },
             Key::Ctrl('v') => {
                 match self.paste_content() {
                     Ok(v) => {
-                        for c in v.chars().rev() {
-                            self.document.insert(&self.cursor_position, c);
-                        }
+                        self.document.insert(&self.cursor_position, v.as_bytes());
                     },
                     Err(err) => self.status_message = StatusMessage::from(
-                        format!("Failed to paste content: {err}")
+                        format!("Failed to paste content: {err}").as_bytes()
                     ),
                 }
             }
@@ -139,14 +135,14 @@ impl Editor {
             Key::Ctrl('s') => self.save(),
             Key::Ctrl('f') => self.search(),
             Key::Char(c) => {
-                self.document.insert(&self.cursor_position, c);
+                self.document.insert(&self.cursor_position, c.to_string().as_bytes());
                 self.move_cursor(Key::Right);
             },
             Key::Delete => {
                 match self.document.delete(&self.cursor_position) {
                     Ok(_) => (),
                     Err(err) => self.status_message = StatusMessage::from(
-                        format!("Failed to remove content: {err}")
+                        format!("Failed to remove content: {err}").as_bytes()
                     ),
                 }
             },
@@ -157,7 +153,7 @@ impl Editor {
                     match self.document.delete(&self.cursor_position) {
                         Ok(_) => (),
                         Err(err) => self.status_message = StatusMessage::from(
-                            format!("Failed to remove character: {err}")
+                            format!("Failed to remove character: {err}").as_bytes()
                         ),
                     }
                 }
@@ -177,7 +173,7 @@ impl Editor {
 
         if self.quit_times < QUIT_TIME {
             self.quit_times = QUIT_TIME;
-            self.status_message = StatusMessage::from(String::new());
+            self.status_message = StatusMessage::from(b"");
         }
 
         Ok(())
@@ -188,9 +184,9 @@ impl Editor {
             self.status_message = StatusMessage::from(format!(
                 "WARNING! File has unsaved changes. Press Ctrl-Q {} more time to quit.",
                 self.quit_times
-            ));
+            ).as_bytes());
             self.quit_times -= 1;
-
+            
             return Ok(());
         }
         self.should_quit = true;
@@ -198,15 +194,20 @@ impl Editor {
         Ok(())
     }
 
-    fn refresh_screen(&mut self) -> Result<(), IOError> {
+    fn refresh_screen<'a>(&mut self) -> Result<(), IOError> {
         Terminal::cursor_hide();
         Terminal::cursor_position(&Position::default());
+
+        let highlighted_word = match self.highlighted_word.as_ref() {
+            Some(v) => v.as_slice(),
+            None => b"",
+        };
 
         if self.should_quit {
             Terminal::clear_screen();
         } else {
             self.document.highlight(
-                &self.highlighted_word,
+                Some(highlighted_word),
                 Some(
                     self.offset
                         .y
@@ -226,26 +227,26 @@ impl Editor {
         Terminal::flush()
     }
 
-    fn draw_rows(&self) {
+    fn draw_rows(&mut self) {
         let height = self.terminal.size().height;
 
         for terminal_row in 0..height {
             Terminal::clear_current_line();
 
-            if let Some(row) = self
-                .document
-                .row(self.offset.y.saturating_add(terminal_row as usize)) 
+            let line = self.document.row(self.offset.y.saturating_add(terminal_row as usize)).cloned();
+
+            if let Some(row) = line
             {
-                self.draw_row(row);
+                self.draw_row(&row);
             } else if self.document.is_empty() && terminal_row == height / 3 {
                 self.draw_welcome_message();        
             } else {
-                println!("~\r");
+               self.terminal.write("~\r".as_bytes());
             }
         }
     }
 
-    fn draw_welcome_message(&self) {
+    fn draw_welcome_message(&mut self) {
         let mut welcome_message = format!("Editor -- version {VERSION}");
         let width = self.terminal.size().width as usize;
         let len = welcome_message.len();
@@ -255,7 +256,7 @@ impl Editor {
         welcome_message = format!("~{spaces}{welcome_message}");
         welcome_message.truncate(width);
 
-        println!("{welcome_message}\r");
+        self.terminal.write(welcome_message.as_bytes());
     }
 
     fn move_cursor(&mut self, key: Key) {
@@ -384,7 +385,7 @@ impl Editor {
         Terminal::reset_bg_color();
     }
 
-    fn draw_message_bar(&self) {
+    fn draw_message_bar(&mut self) {
         Terminal::clear_current_line();
         let message = &self.status_message;
 
@@ -392,18 +393,24 @@ impl Editor {
             let mut text = message.text.clone();
 
             text.truncate(self.terminal.size().width as usize);
-            print!("{text}");
+
+            self.terminal.write(text.as_slice());
         }
     }
 
-    fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, IOError> 
+    fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<Vec<u8>>, IOError> 
     where
-        C: FnMut(&mut Self, Key, &String),
+        C: FnMut(&mut Self, Key, &[u8]),
     {
-        let mut result = String::new();
+        let v: Vec<u8> = vec![];
+        let mut result: Vec<u8> = vec![];
+        let s = match str::from_utf8(&v) {
+            Ok(v) => v,
+            Err(err) => return Err(IOError::new(ErrorKind::Other, err)),
+        };
 
         loop {
-            self.status_message = StatusMessage::from(format!("{prompt}{result}"));
+            self.status_message = StatusMessage::from(format!("{prompt}{s}").as_bytes());
             self.refresh_screen()?;
 
             let key = Terminal::read_key()?;
@@ -413,7 +420,14 @@ impl Editor {
                 Key::Char('\n') => break,
                 Key::Char(c) => {
                     if !c.is_control() {
-                        result.push(c);
+                        match str::from_utf8(c.to_string().as_bytes()) {
+                            Ok(v) => {
+                                let value = v.as_bytes()[0];
+
+                                result.push(value);
+                            }
+                            Err(err) => return Err(IOError::new(ErrorKind::Other, err)),
+                        }
                     }
                 },
                 Key::Esc => {
@@ -422,16 +436,18 @@ impl Editor {
                 },
                 _ => (),
             }
-            callback(self, key, &result);
+            callback(self, key, result.as_slice());
         }
 
-        self.status_message = StatusMessage::from(String::new());
+        self.status_message = StatusMessage::from([].as_slice());
 
         if result.is_empty() {
             return Ok(None);
         }
 
-        Ok(Some(result))
+        let slice = result.to_owned();
+
+        Ok(Some(slice))
     }
 
     fn save(&mut self) {
@@ -440,16 +456,17 @@ impl Editor {
                 .prompt("Save as: ", |_, _, _| {}).unwrap_or_default();
 
             if new_name.is_none() {
-                self.status_message = StatusMessage::from("Save aborted.".to_owned());
+                self.status_message = StatusMessage::from("Save aborted.".as_bytes());
                 return;
             }
-            self.document.filename = new_name;
+
+            self.document.filename = Some(str::from_utf8(new_name.unwrap().as_slice()).unwrap().to_owned());
         }
 
         if self.document.save().is_ok() {
-            self.status_message = StatusMessage::from("File saved successfully.".to_owned());
+            self.status_message = StatusMessage::from("File saved successfully.".as_bytes());
         } else {
-            self.status_message = StatusMessage::from("Error writing file!".to_owned());
+            self.status_message = StatusMessage::from("Error writing file!".as_bytes());
         }
     }
 
@@ -496,7 +513,11 @@ impl Editor {
         let row = self.document.row(self.cursor_position.y);
 
         match row{
-            Some(v) => self.clipboard.set_contents(v.as_string().to_owned()),
+            Some(v) => {
+                let content = str::from_utf8(v.get_buffer().borrow_mut().as_slice()).unwrap().to_owned();
+
+                self.clipboard.set_contents(content)
+            },
             None => Err(Box::new(CopyError("content was empty".to_owned()))),
         }
     }

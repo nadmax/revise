@@ -14,7 +14,7 @@ pub struct Size {
 
 pub struct Terminal {
     size: Size,
-    _stdout: RawTerminal<Stdout>,
+    stdout: RawTerminal<Stdout>,
 }
 
 impl Terminal {
@@ -30,7 +30,7 @@ impl Terminal {
                 width: size.0,
                 height: size.1.saturating_sub(2),
             },
-            _stdout: stdout().into_raw_mode()?,
+            stdout: stdout().into_raw_mode()?,
         })
     }
 
@@ -102,6 +102,11 @@ impl Terminal {
 
     pub fn reset_fg_color() {
         print!("{}", color::Fg(color::Reset));
+    }
+
+    pub fn write(&mut self, buf: &[u8]) {
+        let _ = self.stdout.write(buf);
+        let _ = self.stdout.write(b"\n");
     }
 
 }

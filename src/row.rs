@@ -2,65 +2,54 @@ use crate::SearchDirection;
 use crate::highlight;
 use crate::HighlightOptions;
 
-use std::cmp;
+use std::cell::RefCell;
+use bytes::BufMut;
 use termion::color;
-use unicode_segmentation::UnicodeSegmentation;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Row {
     pub is_highlighted: bool,
-    string: String,
+    buffer: RefCell<Vec<u8>>,
     len: usize,
     highlight: Vec<highlight::Type>,
 }
 
-impl From<&str> for Row {
-    fn from(slice: &str) -> Self {
+impl From<u8> for Row {
+    fn from(value: u8) -> Self {
+        let data = vec![value];
+        let buffer = vec![value];
+        let len = String::from_utf8(data).unwrap().len();
+
         Self {
             is_highlighted: false,
-            string: String::from(slice),
-            len: slice.graphemes(true).count(),
+            buffer: RefCell::new(buffer),
+            len,
             highlight: Vec::new(),
         }
     }
 }
 
 impl Row {
-    #[must_use]
-    pub fn render(&self, start: usize, end: usize) -> String {
-        let end = cmp::min(end, self.string.len());
-        let start = cmp::min(start, end);
-        let mut result = String::new();
+    pub fn render(&self) -> Vec<u8> {
+        let mut result = Vec::new();
         let mut current_highlight = &highlight::Type::None;
 
-        for (index, grapheme) in self.string[..]
-            .graphemes(true)
-            .enumerate()
-            .skip(start)
-            .take(end - start)
-        {
-            if let Some(c) = grapheme.chars().next() {
-                let highlight_type = self
-                    .highlight
-                    .get(index)
-                    .unwrap_or(current_highlight);
+        for (index, byte) in self.buffer.borrow_mut().iter().enumerate()    {
+            let highlight = self.highlight.get(index).unwrap_or(current_highlight);
 
-                if highlight_type != current_highlight {
-                    current_highlight = highlight_type;
-                    
-                    let start_highlight = format!(
-                        "{}",
-                        color::Fg(highlight_type.to_color()),
-                    );
-                    
-                    result.push_str(&start_highlight[..]);
-                }
+            if highlight != current_highlight {
+                current_highlight = highlight;
 
-                if c == '\t' {
-                    result.push(' ');
-                } else {
-                    result.push(c);
-                }
+                result.put_slice(format!(
+                    "{}",
+                    color::Fg(current_highlight.to_color()),
+                ).as_bytes());
+            }
+
+            if *byte == b'\t' {
+                result.push(b' ');
+            } else {
+                result.push(*byte);
             }
         }
 
@@ -69,7 +58,7 @@ impl Row {
             color::Fg(color::Reset),
         );
 
-        result.push_str(&end_highlight[..]);
+        result.put_slice(end_highlight[..].as_bytes());
 
         result
     }
@@ -79,142 +68,118 @@ impl Row {
         self.len
     }
 
+    pub fn get_buffer(&self) -> &RefCell<Vec<u8>> {
+        &self.buffer
+    }
+
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
-    pub fn insert(&mut self, at: usize, c: char) {
+    pub fn insert(&mut self, at: usize, slice: &[u8]) {
         if at >= self.len() {
-            self.string.push(c);
+            self.buffer.borrow_mut().put_slice(slice);
             self.len += 1;
 
             return;
         }
 
-        let mut result: String = String::new();
+        let mut result = Vec::new();
         let mut length = 0;
 
-        for (index, grapheme) in self
-            .string[..]
-            .graphemes(true)
-            .enumerate()
-        {
+        for (index, value) in slice.iter().enumerate() {
             length += 1;
-
+            
             if index == at {
                 length += 1;
-                result.push(c);
+                result.push(*value);
             }
 
-            result.push_str(grapheme);
+            result.put_slice(slice)
         }
 
         self.len = length;
-        self.string = result;
+        self.buffer = RefCell::from(result);
     }
 
-    pub fn delete(&mut self, at: usize){
-        if at >= self.len() {
+    pub fn delete(&mut self, at: usize) {
+        if at >= self.len {
             return;
+
         }
 
-        let mut result: String = String::new();
+        let mut result = Vec::new();
         let mut length = 0;
-
-        for (index, grapheme) in self
-            .string[..]
-            .graphemes(true)
-            .enumerate()
-        {
+    
+        for (index, value) in self.buffer.borrow_mut().iter().enumerate() {
             if index != at {
                 length += 1;
-                result.push_str(grapheme);
+                result.push(*value);
             }
         }
 
         self.len = length;
-        self.string = result;
+        self.buffer = RefCell::from(result);
     }
 
-    pub fn append(&mut self, new: &Self) {
-        self.string = format!("{}{}", self.string, new.string);
+    pub fn append(&mut self, new: &mut Self) {
+        self.buffer.borrow_mut().append(&mut new.buffer.borrow_mut());
         self.len += new.len;
     }
 
-    #[must_use]
     pub fn split(&mut self, at: usize) -> Self {
-        let mut row: String = String::new();
+        let mut row = Vec::new();
         let mut length = 0;
-        let mut splitted_row: String = String::new();
+        let mut splitted_row = Vec::new();
         let mut splitted_length = 0;
 
-        for (index, grapheme) in self
-            .string[..]
-            .graphemes(true)
-            .enumerate()
-        {
+        for (index, b) in self.buffer.borrow_mut().iter().enumerate() {
             if index < at {
                 length += 1;
-                row.push_str(grapheme);
+                row.push(*b);
             } else {
                 splitted_length += 1;
-                splitted_row.push_str(grapheme);
+                splitted_row.push(*b);
             }
         }
 
-        self.string = row;
+        self.buffer = RefCell::from(row);
         self.len = length;
         self.is_highlighted = false;
 
         Self {
             is_highlighted: false,
-            string: splitted_row,
+            buffer: RefCell::from(splitted_row),
             len: splitted_length,
             highlight: Vec::new(),
         }
     }
 
-    #[must_use]
-    pub fn as_bytes(&self) -> &[u8] {
-        self.string.as_bytes()
-    }
-
-    #[must_use]
-    pub fn find(&self, query: &str, at: usize, direction: SearchDirection) -> Option<usize> {
+    pub fn find(&self, query: &[u8], at: usize, direction: SearchDirection) -> Option<usize> {
         if at > self.len {
             return None;
         }
 
-        let start = if direction == SearchDirection::Forward {
-            at
-        } else {
-            0
+        let start = match direction {
+            SearchDirection::Forward => at,
+            SearchDirection::Backward => 0,
         };
-        let end = if direction == SearchDirection::Forward {
-            self.len
-        } else {
-            at
-        };        
-        let substring: String = self
-            .string[..]
-            .graphemes(true)
-            .skip(start)
-            .take(end - start)
-            .collect();
-        let matching_byte_index = if direction == SearchDirection::Forward {
-            substring.find(query)
-        } else {
-            substring.rfind(query)
+        let _end = match direction {
+            SearchDirection::Forward => self.len,
+            SearchDirection::Backward => at,
+        };
+        let borrowed_buf = self.buffer.borrow_mut();
+        let subslice = borrowed_buf.as_slice();
+        let matching_byte_index = match direction {
+            SearchDirection::Forward => bfind(subslice, query),
+            SearchDirection::Backward => rbfind(subslice, query),
         };
 
-        if let Some(matching_byte_index) = matching_byte_index {
-            for (grapheme_index, (byte_index, _)) in substring
-                .grapheme_indices(true)
-                .enumerate()
-            {
+        if let Some(matching_byte_index) = matching_byte_index {  
+            for (byte_index, _) in subslice.iter().enumerate() {
                 if matching_byte_index == byte_index {
-                    return Some(start + grapheme_index);
+                    return Some(start + matching_byte_index);
                 }
             }
         }
@@ -223,19 +188,14 @@ impl Row {
     }
 
     pub fn highlight(
-        &mut self, 
-        opts: &HighlightOptions, 
-        word: &Option<String>,
+        &mut self,
+        opts: &HighlightOptions,
+        word: Option<&[u8]>,
         start_with_comment: bool,
     ) -> bool {
-        let len = self.string.len();
-        let chars: Vec<char> = self.string.chars().collect();
-
         if self.is_highlighted && word.is_none() {
             if let Some(hl_type) = self.highlight.last() {
-                if *hl_type == highlight::Type::MultilineComment 
-                    && len > 1 && self.string[len - 2..] == *"*/"
-                {
+                if *hl_type == highlight::Type::MultilineComment && self.len > 1 && bfind(&self.buffer.borrow_mut()[self.len - 2..], b"*/").is_some() {
                     return true;
                 }
             }
@@ -248,10 +208,10 @@ impl Row {
         let mut in_ml_comment = start_with_comment;
 
         if in_ml_comment {
-            let closing_index = if let Some(closing_index) = self.string.find("*/") {
+            let closing_index = if let Some(closing_index) = bfind(&self.buffer.borrow_mut().as_slice(), b"*/") {
                 closing_index + 2
             } else {
-                chars.len()
+                self.buffer.borrow_mut().len()
             };
 
             for _ in 0..closing_index {
@@ -261,8 +221,12 @@ impl Row {
             index = closing_index;
         }
 
-        while let Some(c) = chars.get(index) {
-            if self.highlight_multiline_comment(&mut index, opts, *c, &chars) {
+        let v = self.buffer.clone();
+
+        while let Some(b) = v.borrow().get(index) {
+            let cloned_buf = self.buffer.borrow().clone();
+
+            if self.highlight_multiline_comment(&mut index, opts, *b, &cloned_buf.as_slice()) {
                 in_ml_comment = true;
 
                 continue;
@@ -270,12 +234,12 @@ impl Row {
 
             in_ml_comment = false;
 
-            if self.highlight_char(&mut index, opts, *c, &chars) 
-                || self.highlight_comment(&mut index, opts, *c, &chars) 
-                || self.highlight_primary_keywords(&mut index, opts, &chars) 
-                || self.highlight_secondary_keywords(&mut index, opts, &chars) 
-                || self.highlight_string(&mut index, opts, *c, &chars) 
-                || self.highlight_number(&mut index, opts, *c, &chars)
+            if self.highlight_bytes(&mut index, opts, *b, &cloned_buf.as_slice()) 
+                || self.highlight_comment(&mut index, opts, *b, &cloned_buf.as_slice()) 
+                || self.highlight_primary_keywords(&mut index, opts, &cloned_buf.as_slice()) 
+                || self.highlight_secondary_keywords(&mut index, opts, &cloned_buf.as_slice()) 
+                || self.highlight_string(&mut index, opts, *b, &cloned_buf.as_slice()) 
+                || self.highlight_number(&mut index, opts, *b, &cloned_buf.as_slice())
             {
                 continue;
             }
@@ -286,7 +250,7 @@ impl Row {
 
         self.highlight_match(word);
 
-        if in_ml_comment && &self.string[self.string.len().saturating_sub(2)..] != "*/" {
+        if in_ml_comment && &self.buffer.borrow().as_slice()[self.buffer.borrow().len().saturating_sub(2)..] != b"*/" {
             return true;
         }
 
@@ -295,49 +259,45 @@ impl Row {
         false
     }
 
-    pub fn as_string(&self) -> &String {
-        &self.string
-    }
-
-    fn highlight_match(&mut self, word: &Option<String>) {
-        if let Some(word) = word {
+    fn highlight_match(&mut self, word: Option<&[u8]>) {
+        let slice = if let Some(word) = word {
             if word.is_empty() {
                 return;
+            } else {
+                word
             }
+        } else {
+            return;
+        };
 
-            let mut index = 0;
+        let mut index = 0;
 
-            while let Some(search_match) = self.find(word, index, SearchDirection::Forward) {
-                if let Some(next_index) = search_match.checked_add(
-                    word[..].graphemes(true).count(),
-                ) {
-                    for i in index.saturating_add(search_match)..next_index {
-                        self.highlight[i] = highlight::Type::Match;
-                    }
-
-                    index = next_index;
-                } else {
-                    break;
+        while let Some(search_match) = self.find(slice, index, SearchDirection::Forward) {
+            if let Some(next_index) = search_match.checked_add(slice.len()) {
+                for i in index.saturating_add(search_match)..next_index {
+                    self.highlight[i] = highlight::Type::Match;
                 }
+
+                index = next_index;
+            } else {
+                break;
             }
         }
-
     }
 
     fn highlight_str(
         &mut self,
         index: &mut usize,
-        substring: &str,
-        chars: &[char],
+        slice: &[u8],
         hl_type: highlight::Type,
     ) -> bool {
-        if substring.is_empty() {
+        if slice.is_empty() {
             return false;
         }
 
-        for (substring_index, c) in substring.chars().enumerate() {
-            if let Some(next_char) = chars.get(index.saturating_add(substring_index)) {
-                if *next_char != c {
+        for (byte_index, value) in slice.iter().enumerate() {
+            if let Some(next_byte) = slice.get(index.saturating_add(byte_index)) {
+                if *next_byte != *value {
                     return false;
                 }
             } else {
@@ -345,7 +305,7 @@ impl Row {
             }
         }
 
-        for _ in 0..substring.len() {
+        for _ in 0..slice.len() {
             self.highlight.push(hl_type);
             *index += 1;
         }
@@ -353,23 +313,24 @@ impl Row {
         true
     }
 
-    fn highlight_char(
+
+    fn highlight_bytes(
         &mut self,
         index: &mut usize,
         opts: &HighlightOptions,
-        c: char,
-        chars: &[char],
+        b: u8,
+        slice: &[u8],
     ) -> bool {
-        if opts.char() && c == '\'' {
-            if let Some(next_char) = chars.get(index.saturating_add(1)) {
-                let closing_index = if *next_char == '\\' {
+        if opts.char() && b == b'\'' {
+            if let Some(next_byte) = slice.get(index.saturating_add(1)) {
+                let closing_index = if *next_byte == b'\\' {
                     index.saturating_add(3)
                 } else {
                     index.saturating_add(2)
                 };
 
-                if let Some(closing_char) = chars.get(closing_index) {
-                    if *closing_char == '\'' {
+                if let Some(closing_byte) = slice.get(closing_index) {
+                    if *closing_byte == b'\'' {
                         for _ in 0..=closing_index.saturating_sub(*index) {
                             self.highlight.push(highlight::Type::Char);
                             *index += 1;
@@ -388,13 +349,13 @@ impl Row {
         &mut self,
         index: &mut usize,
         opts: &HighlightOptions,
-        c: char,
-        chars: &[char],
+        b: u8,
+        slice: &[u8],
     ) -> bool {
-        if opts.comments() && c == '/' && *index < chars.len() {
-            if let Some(next_char) = chars.get(index.saturating_add(1)) {
-                if *next_char == '/' {
-                    for _ in *index..chars.len() {
+        if opts.comments() && b == b'/' && *index < slice.len() {
+            if let Some(next_byte) = slice.get(index.saturating_add(1)) {
+                if *next_byte == b'/' {
+                    for _ in *index..slice.len() {
                         self.highlight.push(highlight::Type::Comment);
                         *index += 1;
                     }
@@ -411,26 +372,25 @@ impl Row {
         &mut self,
         index: &mut usize,
         opts: &HighlightOptions,
-        c: char,
-        chars: &[char],
+        b: u8,
+        slice: &[u8],
     ) -> bool {
-        if opts.strings() && c == '"' {
+        if opts.strings() && b == b'"' {
             loop {
                 self.highlight.push(highlight::Type::String);
                 *index += 1;
 
-                if let Some(next_char) = chars.get(*index) {
-                    if *next_char == '"' {
+                if let Some(next_byte) = slice.get(*index) {
+                    if *next_byte == b'"' {
                         break;
                     }
                 } else {
                     break;
                 }
             }
-
             self.highlight.push(highlight::Type::String);
             *index += 1;
-
+    
             return true;
         }
 
@@ -441,58 +401,62 @@ impl Row {
         &mut self,
         index: &mut usize,
         opts: &HighlightOptions,
-        c: char,
-        chars: &[char],
+        b: u8,
+        slice: &[u8],
     ) -> bool {
-        if opts.numbers() && c.is_ascii_digit() {
+        if opts.numbers() && b.is_ascii_digit() {
             if *index > 0 {
-                let prev_char = chars[*index - 1];
+                let prev_byte = slice[*index - 1];
 
-                if !is_separator(prev_char) {
+                if !is_separator(prev_byte) {
                     return false;
                 }
             }
+
             loop {
                 self.highlight.push(highlight::Type::Number);
                 *index += 1;
-                if let Some(next_char) = chars.get(*index) {
-                    if *next_char != '.' && !next_char.is_ascii_digit() {
+
+                if let Some(next_byte) = slice.get(*index) {
+                    if *next_byte != b'.' && !next_byte.is_ascii_digit() {
                         break;
                     }
                 } else {
                     break;
                 }
             }
+
             return true;
         }
+
         false
     }
 
     fn highlight_keywords(
         &mut self,
         index: &mut usize,
-        chars: &[char],
+        slice: &[u8],
         keywords: &[String],
         hl_type: highlight::Type,
     ) -> bool {
         if *index > 0 {
-            let prev_char = chars[*index - 1];
+            let prev_byte = slice[*index - 1];
 
-            if !is_separator(prev_char) {
+            if !is_separator(prev_byte) {
                 return false;
             }
         }
 
         for word in keywords {
-            if *index < chars.len().saturating_sub(word.len()) {
-                let next_char = chars[*index + word.len()];
+            if *index < slice.len().saturating_sub(word.len()) {
+                let next_byte = slice[*index + word.len()];
 
-                if !is_separator(next_char) {
+                if !is_separator(next_byte) {
                     continue;
                 }
             }
 
-            if self.highlight_str(index, word, chars, hl_type) {
+            if self.highlight_str(index, slice, hl_type) {
                 return true;
             }
         }
@@ -504,11 +468,11 @@ impl Row {
         &mut self,
         index: &mut usize,
         opts: &HighlightOptions,
-        chars: &[char],
+        slice: &[u8],
     ) -> bool {
         self.highlight_keywords(
             index,
-            chars,
+            slice,
             opts.primary_keywords(),
             highlight::Type::PrimaryKeywords,
         )
@@ -518,11 +482,11 @@ impl Row {
         &mut self,
         index: &mut usize,
         opts: &HighlightOptions,
-        chars: &[char],
+        slice: &[u8],
     ) -> bool {
         self.highlight_keywords(
             index,
-            chars,
+            slice,
             opts.secondary_keywords(),
             highlight::Type::SecondaryKeywords,
         )
@@ -532,18 +496,17 @@ impl Row {
         &mut self,
         index: &mut usize,
         opts: &HighlightOptions,
-        c: char,
-        chars: &[char],
+        b: u8,
+        slice: &[u8],
     ) -> bool {
-        if opts.comments() && c == '/' && *index < chars.len() {
-            if let Some(next_char) = chars.get(index.saturating_add(1)) {
-                if *next_char == '*' {
-                    let closing_index = 
-                        if let Some(closing_index) = self.string[*index + 2..].find("*/") {
-                            *index + closing_index + 4
-                        } else {
-                            chars.len()
-                        };
+        if opts.multiline_comments() && b == b'/' && *index < slice.len() {
+            if let Some(next_byte) = slice.get(index.saturating_add(1)) {
+                if *next_byte == b'*' {
+                    let closing_index = if let Some(closing_index) = bfind(&self.buffer.borrow_mut().as_slice()[*index + 2..], b"*/") {
+                        *index + closing_index + 4
+                    } else {
+                        slice.len()
+                    };
 
                     for _ in *index..closing_index {
                         self.highlight.push(highlight::Type::MultilineComment);
@@ -557,50 +520,17 @@ impl Row {
 
         false
     }
+    
 }
 
-fn is_separator(c: char) -> bool {
-    c.is_ascii_punctuation() || c.is_ascii_whitespace()
+fn bfind(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack.windows(needle.len()).position(|window| window == needle)
 }
 
-#[cfg(test)]
-mod row_tests {
-    use super::*;
+fn rbfind(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack.windows(needle.len()).rposition(|window| window == needle)
+}
 
-    #[test]
-    fn test_find() {
-        let row = Row::from("test123");
-
-        assert_eq!(row.find("t", 0, SearchDirection::Forward), Some(0));
-        assert_eq!(row.find("t", 2, SearchDirection::Forward), Some(3));
-        assert_eq!(row.find("t", 5, SearchDirection::Forward), None);
-    }
-
-    #[test]
-    fn test_highlight_match() {
-        let mut row = Row::from("test123");
-
-        row.highlight = vec![
-            highlight::Type::Char,
-            highlight::Type::Char,
-            highlight::Type::Char,
-            highlight::Type::Char,
-            highlight::Type::Number,
-            highlight::Type::Number,
-            highlight::Type::Number,
-        ];
-        row.highlight_match(&Some("t".to_string()));
-        assert_eq!(
-            vec![
-                highlight::Type::Match,
-                highlight::Type::Char,
-                highlight::Type::Char,
-                highlight::Type::Char,
-                highlight::Type::Number,
-                highlight::Type::Number,
-                highlight::Type::Number,
-            ],
-            row.highlight
-        )
-    }
+fn is_separator(b: u8) -> bool {
+    b.is_ascii_punctuation() || b.is_ascii_whitespace()
 }

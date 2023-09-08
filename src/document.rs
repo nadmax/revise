@@ -5,7 +5,7 @@ use crate::FileType;
 use crate::RowDeletionError;
 
 use std::error::Error;
-use std::fs::{File, read_to_string};
+use std::fs::{File, read};
 use std::io::{Error as IOError, Write};
 
 #[derive(Default)]
@@ -17,15 +17,12 @@ pub struct Document {
 }
 
 impl Document {
-    /// # Errors
-    /// 
-    /// Will return `Error` if it fails read filename
-    pub fn open(filename: &str) -> Result<Self, IOError> {
-        let contents = read_to_string(filename)?;
+    pub fn open(filename: &str)  -> Result<Self, IOError> {
+        let buffer = read(filename)?;
         let file_type = FileType::from(filename);
         let mut rows = Vec::new();
 
-        for value in contents.lines() {
+        for value in buffer {
             rows.push(Row::from(value));
         }
 
@@ -33,7 +30,7 @@ impl Document {
             rows,
             filename: Some(filename.to_owned()),
             changed: false,
-            file_type,
+            file_type
         })
     }
 
@@ -52,26 +49,24 @@ impl Document {
         self.rows.len()
     }
 
-    /// # Panics
-    /// 
-    /// Will panic if there is no row to insert
-    pub fn insert(&mut self, at: &Position, c: char) {
+    pub fn insert(&mut self, at: &Position, slice: &[u8]) {
         if at.y > self.rows.len() {
             return;
         }
 
         self.changed = true;
 
-        if c == '\n' {
+        if slice == b"\n" {
             self.insert_newline(at);
         } else if at.y == self.rows.len() {
             let mut row = Row::default();
-            row.insert(0, c);
+
+            row.insert(0, slice);
             self.rows.push(row);
         } else {
-            #[allow(clippy::indexing_slicing)]
             let row = &mut self.rows[at.y];
-            row.insert(at.x, c);
+
+            row.insert(at.x, slice);
         }
 
         self.unhighlight_rows(at.y);
@@ -93,10 +88,10 @@ impl Document {
         match row {
             Some(r) => {
                 if at.x == r.len() && at.y < len - 1 {
-                    let next_row = self.rows.remove(at.y + 1);
+                    let mut next_row = self.rows.remove(at.y + 1);
                     let row = &mut self.rows[at.y];
 
-                    row.append(&next_row);
+                    row.append(&mut next_row);
                 } else {
                     let row = &mut self.rows[at.y];
 
@@ -120,7 +115,7 @@ impl Document {
             self.file_type = FileType::from(filename);
 
             for row in &mut self.rows {
-                file.write_all(row.as_bytes())?;
+                file.write_all(row.get_buffer().borrow_mut().as_slice())?;
                 file.write_all(b"\n")?;
             }
 
@@ -136,7 +131,7 @@ impl Document {
     }
 
     #[must_use]
-    pub fn find(&self, query: &str, at: &Position, direction: SearchDirection) -> Option<Position> {
+    pub fn find(&self, query: &[u8], at: &Position, direction: SearchDirection) -> Option<Position> {
         if at.y >= self.rows.len() {
             return None;
         }
@@ -176,7 +171,7 @@ impl Document {
         None
     }
 
-    pub fn highlight(&mut self, word: &Option<String>, until: Option<usize>) {
+    pub fn highlight(&mut self, word: Option<&[u8]>, until: Option<usize>) {
         let mut start_with_comment = false;
         let len = self.rows.len();
         let until = if let Some(until) = until {
