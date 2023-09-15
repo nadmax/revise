@@ -9,3 +9,10 @@ repository = "https://github.com/nadmax/editor"
 termion = "2.0.1"
 unicode-segmentation = "1.10.1"
 cli-clipboard = "0.4.0"
+
+[profile.release]
+strip = true
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

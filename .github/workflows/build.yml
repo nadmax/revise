@@ -40,4 +40,4 @@ jobs:
     
     - name: Build code
       run: |
-        cargo build --verbose
+        cargo build --verbose --release
