@@ -91,7 +91,7 @@ impl Editor {
     pub fn run(&mut self) {
         loop {
             if let Err(error) = self.refresh_screen() {
-                die(&error);
+                die(error);
             }
 
             if self.should_quit {
@@ -99,7 +99,7 @@ impl Editor {
             }
 
             if let Err(error) = self.process_keypress() {
-                die(&error);
+                die(Box::new(error));
             }
         }
     }
@@ -127,7 +127,13 @@ impl Editor {
             Key::Ctrl('v') => match self.paste_content() {
                 Ok(v) => {
                     for c in v.chars().rev() {
-                        self.document.insert(&self.cursor_position, c);
+                        match self.document.insert(&self.cursor_position, c) {
+                            Ok(_) => (),
+                            Err(err) => {
+                                self.status_message =
+                                    StatusMessage::from(format!("Failed to paste content: {err}"))
+                            }
+                        }
                     }
                 }
                 Err(err) => {
@@ -138,10 +144,13 @@ impl Editor {
             Key::Ctrl('q') => return self.quit(),
             Key::Ctrl('s') => self.save(),
             Key::Ctrl('f') => self.search(),
-            Key::Char(c) => {
-                self.document.insert(&self.cursor_position, c);
-                self.move_cursor(Key::Right);
-            }
+            Key::Char(c) => match self.document.insert(&self.cursor_position, c) {
+                Ok(_) => self.move_cursor(Key::Right),
+                Err(err) => {
+                    self.status_message =
+                        StatusMessage::from(format!("Failed to paste content: {err}"))
+                }
+            },
             Key::Delete => match self.document.delete(&self.cursor_position) {
                 Ok(_) => (),
                 Err(err) => {
@@ -198,32 +207,40 @@ impl Editor {
         Ok(())
     }
 
-    fn refresh_screen(&mut self) -> Result<(), IOError> {
+    fn refresh_screen(&mut self) -> Result<(), Box<dyn Error>> {
         Terminal::cursor_hide();
         Terminal::cursor_position(&Position::default());
 
         if self.should_quit {
             Terminal::clear_screen();
         } else {
-            self.document.highlight(
+            match self.document.highlight(
                 &self.highlighted_word,
                 Some(
                     self.offset
                         .y
                         .saturating_add(self.terminal.size().height as usize),
                 ),
-            );
-            self.draw_rows();
-            self.draw_status_bar();
-            self.draw_message_bar();
-            Terminal::cursor_position(&Position {
-                x: self.cursor_position.x.saturating_sub(self.offset.x),
-                y: self.cursor_position.y.saturating_sub(self.offset.y),
-            });
+            ) {
+                Ok(_) => {
+                    self.draw_rows();
+                    self.draw_status_bar();
+                    self.draw_message_bar();
+                    Terminal::cursor_position(&Position {
+                        x: self.cursor_position.x.saturating_sub(self.offset.x),
+                        y: self.cursor_position.y.saturating_sub(self.offset.y),
+                    });
+                }
+                Err(err) => return Err(err),
+            }
         }
 
         Terminal::cursor_show();
-        Terminal::flush()
+
+        match Terminal::flush() {
+            Ok(_) => Ok(()),
+            Err(err) => return Err(Box::new(err)),
+        }
     }
 
     fn draw_rows(&self) {
@@ -396,7 +413,7 @@ impl Editor {
         }
     }
 
-    fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, IOError>
+    fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, Box<dyn Error>>
     where
         C: FnMut(&mut Self, Key, &String),
     {
@@ -521,7 +538,7 @@ impl Editor {
     }
 }
 
-fn die(err: &IOError) {
+fn die(err: Box<dyn Error>) {
     Terminal::clear_screen();
 
     panic!("{}", err)
