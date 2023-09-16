@@ -420,10 +420,15 @@ impl Row {
     ) -> bool {
         if opts.numbers() && c.is_ascii_digit() {
             if *index > 0 {
-                let prev_char = chars[*index - 1];
+                let prev_char = chars.get(*index + 1);
 
-                if !is_separator(prev_char) {
-                    return false;
+                match prev_char {
+                    Some(c) => {
+                        if !is_separator(*c) {
+                            return false;
+                        }
+                    }
+                    None => return false,
                 }
             }
 
@@ -453,10 +458,15 @@ impl Row {
         hl_type: highlight::Type,
     ) -> bool {
         if *index > 0 {
-            let prev_char = chars[*index - 1];
+            let prev_char = chars.get(*index + 1);
 
-            if !is_separator(prev_char) {
-                return false;
+            match prev_char {
+                Some(c) => {
+                    if !is_separator(*c) {
+                        return false;
+                    }
+                }
+                None => return false,
             }
         }
 

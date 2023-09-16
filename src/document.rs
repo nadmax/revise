@@ -1,7 +1,9 @@
 use crate::FileType;
+use crate::HighlightError;
 use crate::Position;
 use crate::Row;
 use crate::RowDeletionError;
+use crate::RowInsertionError;
 use crate::SearchDirection;
 
 use std::error::Error;
@@ -52,29 +54,34 @@ impl Document {
         self.rows.len()
     }
 
-    /// # Panics
-    ///
-    /// Will panic if there is no row to insert
-    pub fn insert(&mut self, at: &Position, c: char) {
+    pub fn insert(&mut self, at: &Position, c: char) -> Result<(), Box<dyn Error>> {
         if at.y > self.rows.len() {
-            return;
+            return Ok(());
         }
 
         self.changed = true;
 
         if c == '\n' {
-            self.insert_newline(at);
+            match self.insert_newline(at) {
+                Ok(_) => (),
+                Err(err) => return Err(err),
+            }
         } else if at.y == self.rows.len() {
             let mut row = Row::default();
             row.insert(0, c);
             self.rows.push(row);
         } else {
-            #[allow(clippy::indexing_slicing)]
-            let row = &mut self.rows[at.y];
-            row.insert(at.x, c);
+            let row = self.rows.get_mut(at.y);
+
+            match row {
+                Some(r) => r.insert(at.x, c),
+                None => return Err(Box::new(RowInsertionError(at.x, at.y))),
+            }
         }
 
         self.unhighlight_rows(at.y);
+
+        Ok(())
     }
 
     /// # Errors
@@ -94,13 +101,19 @@ impl Document {
             Some(r) => {
                 if at.x == r.len() && at.y < len - 1 {
                     let next_row = self.rows.remove(at.y + 1);
-                    let row = &mut self.rows[at.y];
+                    let row = self.rows.get_mut(at.y);
 
-                    row.append(&next_row);
+                    match row {
+                        Some(r) => r.append(&next_row),
+                        None => return Err(Box::new(RowDeletionError(at.x, at.y))),
+                    }
                 } else {
-                    let row = &mut self.rows[at.y];
+                    let row = self.rows.get_mut(at.y);
 
-                    row.delete(at.x);
+                    match row {
+                        Some(r) => r.delete(at.x),
+                        None => return Err(Box::new(RowDeletionError(at.x, at.y))),
+                    }
                 }
 
                 self.unhighlight_rows(at.y);
@@ -166,7 +179,10 @@ impl Document {
                     position.x = 0;
                 } else {
                     position.y = position.y.saturating_sub(1);
-                    position.x = self.rows[position.y].len();
+                    match self.rows.get(position.y) {
+                        Some(row) => position.x = row.len(),
+                        None => return None,
+                    }
                 }
             } else {
                 return None;
@@ -176,7 +192,11 @@ impl Document {
         None
     }
 
-    pub fn highlight(&mut self, word: &Option<String>, until: Option<usize>) {
+    pub fn highlight(
+        &mut self,
+        word: &Option<String>,
+        until: Option<usize>,
+    ) -> Result<(), Box<dyn Error>> {
         let mut start_with_comment = false;
         let len = self.rows.len();
         let until = if let Some(until) = until {
@@ -188,31 +208,46 @@ impl Document {
         } else {
             len
         };
+        let rows = self.rows.get_mut(..until);
 
-        for row in &mut self.rows[..until] {
-            start_with_comment =
-                row.highlight(self.file_type.highlight_options(), word, start_with_comment);
+        match rows {
+            Some(r) => {
+                for row in r {
+                    start_with_comment =
+                        row.highlight(self.file_type.highlight_options(), word, start_with_comment);
+                }
+            }
+            None => return Err(Box::new(HighlightError)),
         }
+
+        Ok(())
     }
 
     pub fn file_type(&self) -> String {
         self.file_type.name()
     }
 
-    fn insert_newline(&mut self, at: &Position) {
+    fn insert_newline(&mut self, at: &Position) -> Result<(), Box<dyn Error>> {
         if at.y > self.rows.len() {
-            return;
+            return Ok(());
         }
 
         if at.y == self.rows.len() {
             self.rows.push(Row::default());
-            return;
+            return Ok(());
         }
 
-        let current_row = &mut self.rows[at.y];
-        let new_row = current_row.split(at.x);
+        let current_row = self.rows.get_mut(at.y);
 
-        self.rows.insert(at.y + 1, new_row);
+        match current_row {
+            Some(row) => {
+                let new_row = row.split(at.x);
+                self.rows.insert(at.y + 1, new_row);
+
+                Ok(())
+            }
+            None => return Err(Box::new(RowInsertionError(at.x, at.y))),
+        }
     }
 
     fn unhighlight_rows(&mut self, start: usize) {
