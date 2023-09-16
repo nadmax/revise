@@ -52,7 +52,7 @@ impl Row {
                         "{}",
                         color::Fg(highlight_type.to_color()),
                     );
-                    
+
                     result.push_str(&start_highlight[..]);
                 }
 
@@ -452,6 +452,7 @@ impl Row {
                     return false;
                 }
             }
+
             loop {
                 self.highlight.push(highlight::Type::Number);
                 *index += 1;
@@ -463,8 +464,10 @@ impl Row {
                     break;
                 }
             }
+
             return true;
         }
+
         false
     }
 
