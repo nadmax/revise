@@ -8,6 +8,7 @@ mod highlight;
 mod filetype;
 
 use editor::Editor;
+use std::error::Error;
 pub use terminal::Terminal;
 pub use editor::Position;
 pub use editor::SearchDirection;
@@ -17,6 +18,10 @@ pub use row::Row;
 pub use filetype::FileType;
 pub use filetype::HighlightOptions;
 
-fn main() {
-    Editor::new().run();
+fn main() -> Result<(), Box<dyn Error>> {
+    let mut editor = Editor::new()?;
+
+    editor.run();
+
+    Ok(())
 }

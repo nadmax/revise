@@ -55,7 +55,7 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, Box<dyn Error>> {
         let args: Vec<String> = env::args().collect();
         let mut initial_status = 
             String::from("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
@@ -72,18 +72,20 @@ impl Editor {
         } else {
             Document::default()
         };
+        let terminal = Terminal::new()?;
+        let clipboard = ClipboardContext::new()?;
 
-        Self {
+        Ok(Self {
             should_quit: false,
-            terminal: Terminal::new().expect("Failed to initialize terminal"),
+            terminal,
             cursor_position: Position::default(),
             offset: Position::default(),
             document,
             status_message: StatusMessage::from(initial_status),
             quit_times: QUIT_TIME,
             highlighted_word: None,
-            clipboard: ClipboardContext::new().expect("Failed to initialize clipboard"),
-        }
+            clipboard,
+        })
     }
 
     pub fn run(&mut self) {
