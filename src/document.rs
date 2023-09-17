@@ -1,11 +1,11 @@
-use crate::Row;
-use crate::Position;
-use crate::SearchDirection;
 use crate::FileType;
+use crate::Position;
+use crate::Row;
 use crate::RowDeletionError;
+use crate::SearchDirection;
 
 use std::error::Error;
-use std::fs::{File, read_to_string};
+use std::fs::{read_to_string, File};
 use std::io::{Error as IOError, Write};
 
 #[derive(Default)]
@@ -18,7 +18,7 @@ pub struct Document {
 
 impl Document {
     /// # Errors
-    /// 
+    ///
     /// Will return `Error` if it fails read filename
     pub fn open(filename: &str) -> Result<Self, IOError> {
         let contents = read_to_string(filename)?;
@@ -53,7 +53,7 @@ impl Document {
     }
 
     /// # Panics
-    /// 
+    ///
     /// Will panic if there is no row to insert
     pub fn insert(&mut self, at: &Position, c: char) {
         if at.y > self.rows.len() {
@@ -78,7 +78,7 @@ impl Document {
     }
 
     /// # Errors
-    /// 
+    ///
     /// Will return `Error` if it fails to get the row to delete
     pub fn delete(&mut self, at: &Position) -> Result<(), Box<dyn Error>> {
         let len = self.len();
@@ -106,13 +106,13 @@ impl Document {
                 self.unhighlight_rows(at.y);
 
                 Ok(())
-            },
-            None => Err(Box::new(RowDeletionError(at.x, at.y)))
+            }
+            None => Err(Box::new(RowDeletionError(at.x, at.y))),
         }
     }
 
     /// # Errors
-    /// 
+    ///
     /// Will return `Error` if it fails to create a file to save
     pub fn save(&mut self) -> Result<(), IOError> {
         if let Some(filename) = &self.filename {
@@ -141,7 +141,7 @@ impl Document {
             return None;
         }
 
-        let mut position = Position {x: at.x, y: at.y };
+        let mut position = Position { x: at.x, y: at.y };
         let start = if direction == SearchDirection::Forward {
             at.y
         } else {
@@ -190,11 +190,8 @@ impl Document {
         };
 
         for row in &mut self.rows[..until] {
-            start_with_comment = row.highlight(
-                self.file_type.highlight_options(), 
-                word, 
-                start_with_comment,
-            );
+            start_with_comment =
+                row.highlight(self.file_type.highlight_options(), word, start_with_comment);
         }
     }
 
@@ -235,13 +232,10 @@ mod document_tests {
     fn test_save() {
         let mut new_doc = Document {
             filename: Some("test.txt".to_owned()),
-            .. Document::default()
+            ..Document::default()
         };
         let save_res = new_doc.save();
 
-        assert_eq!(
-            save_res.ok(),
-            Some(()),
-        );
+        assert_eq!(save_res.ok(), Some(()),);
     }
 }

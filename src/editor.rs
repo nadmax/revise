@@ -1,15 +1,15 @@
-use crate::Terminal;
+use crate::CopyError;
 use crate::Document;
 use crate::Row;
-use crate::CopyError;
+use crate::Terminal;
 
+use cli_clipboard::{ClipboardContext, ClipboardProvider};
+use std::env;
 use std::error::Error;
 use std::io::Error as IOError;
-use std::env;
 use std::time::{Duration, Instant};
-use termion::event::Key;
 use termion::color;
-use cli_clipboard::{ClipboardContext, ClipboardProvider};
+use termion::event::Key;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
@@ -57,7 +57,7 @@ pub struct Editor {
 impl Editor {
     pub fn new() -> Result<Self, Box<dyn Error>> {
         let args: Vec<String> = env::args().collect();
-        let mut initial_status = 
+        let mut initial_status =
             String::from("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
         let document = if args.len() > 1 {
             let filename = &args[1];
@@ -117,39 +117,36 @@ impl Editor {
         let pressed_key = Terminal::read_key()?;
 
         match pressed_key {
-            Key::Ctrl('c') => {
-                match self.copy_content() {
-                    Ok(_) => (),
-                    Err(err) => self.status_message = StatusMessage::from(
-                        format!("Failed to copy content: {err}")
-                    ),
+            Key::Ctrl('c') => match self.copy_content() {
+                Ok(_) => (),
+                Err(err) => {
+                    self.status_message =
+                        StatusMessage::from(format!("Failed to copy content: {err}"))
                 }
             },
-            Key::Ctrl('v') => {
-                match self.paste_content() {
-                    Ok(v) => {
-                        for c in v.chars().rev() {
-                            self.document.insert(&self.cursor_position, c);
-                        }
-                    },
-                    Err(err) => self.status_message = StatusMessage::from(
-                        format!("Failed to paste content: {err}")
-                    ),
+            Key::Ctrl('v') => match self.paste_content() {
+                Ok(v) => {
+                    for c in v.chars().rev() {
+                        self.document.insert(&self.cursor_position, c);
+                    }
                 }
-            }
+                Err(err) => {
+                    self.status_message =
+                        StatusMessage::from(format!("Failed to paste content: {err}"))
+                }
+            },
             Key::Ctrl('q') => return self.quit(),
             Key::Ctrl('s') => self.save(),
             Key::Ctrl('f') => self.search(),
             Key::Char(c) => {
                 self.document.insert(&self.cursor_position, c);
                 self.move_cursor(Key::Right);
-            },
-            Key::Delete => {
-                match self.document.delete(&self.cursor_position) {
-                    Ok(_) => (),
-                    Err(err) => self.status_message = StatusMessage::from(
-                        format!("Failed to remove content: {err}")
-                    ),
+            }
+            Key::Delete => match self.document.delete(&self.cursor_position) {
+                Ok(_) => (),
+                Err(err) => {
+                    self.status_message =
+                        StatusMessage::from(format!("Failed to remove content: {err}"))
                 }
             },
             Key::Backspace => {
@@ -158,17 +155,18 @@ impl Editor {
 
                     match self.document.delete(&self.cursor_position) {
                         Ok(_) => (),
-                        Err(err) => self.status_message = StatusMessage::from(
-                            format!("Failed to remove character: {err}")
-                        ),
+                        Err(err) => {
+                            self.status_message =
+                                StatusMessage::from(format!("Failed to remove character: {err}"))
+                        }
                     }
                 }
-            },
-            Key::Up 
-            | Key::Down 
-            | Key::Left 
-            | Key::Right 
-            | Key::PageUp 
+            }
+            Key::Up
+            | Key::Down
+            | Key::Left
+            | Key::Right
+            | Key::PageUp
             | Key::PageDown
             | Key::End
             | Key::Home => self.move_cursor(pressed_key),
@@ -218,9 +216,9 @@ impl Editor {
             self.draw_rows();
             self.draw_status_bar();
             self.draw_message_bar();
-            Terminal::cursor_position(&Position { 
-                x: self.cursor_position.x.saturating_sub(self.offset.x), 
-                y: self.cursor_position.y.saturating_sub(self.offset.y), 
+            Terminal::cursor_position(&Position {
+                x: self.cursor_position.x.saturating_sub(self.offset.x),
+                y: self.cursor_position.y.saturating_sub(self.offset.y),
             });
         }
 
@@ -236,11 +234,11 @@ impl Editor {
 
             if let Some(row) = self
                 .document
-                .row(self.offset.y.saturating_add(terminal_row as usize)) 
+                .row(self.offset.y.saturating_add(terminal_row as usize))
             {
                 self.draw_row(row);
             } else if self.document.is_empty() && terminal_row == height / 3 {
-                self.draw_welcome_message();        
+                self.draw_welcome_message();
             } else {
                 println!("~\r");
             }
@@ -262,7 +260,7 @@ impl Editor {
 
     fn move_cursor(&mut self, key: Key) {
         let terminal_height = self.terminal.size().height as usize;
-        let Position {mut y, mut x} = self.cursor_position;
+        let Position { mut y, mut x } = self.cursor_position;
         let height = self.document.len();
         let mut width = if let Some(row) = self.document.row(y) {
             row.len()
@@ -274,7 +272,7 @@ impl Editor {
             Key::Up => y = y.saturating_sub(1),
             Key::Down => {
                 if y < height {
-                    y = y.saturating_add(1);  
+                    y = y.saturating_add(1);
                 }
             }
             Key::Left => {
@@ -289,7 +287,7 @@ impl Editor {
                         x = 0;
                     }
                 }
-            },
+            }
             Key::Right => {
                 if x < width {
                     x += 1;
@@ -304,14 +302,14 @@ impl Editor {
                 } else {
                     0
                 }
-            },
+            }
             Key::PageDown => {
                 y = if y.saturating_add(terminal_height) < height {
                     y.saturating_add(terminal_height)
                 } else {
                     height
                 }
-            },
+            }
             Key::Home => x = 0,
             Key::End => x = width,
             _ => (),
@@ -327,11 +325,11 @@ impl Editor {
             x = width;
         }
 
-        self.cursor_position = Position {x, y}
+        self.cursor_position = Position { x, y }
     }
 
     fn scroll(&mut self) {
-        let Position {x, y} = self.cursor_position;
+        let Position { x, y } = self.cursor_position;
         let width = self.terminal.size().width as usize;
         let height = self.terminal.size().height as usize;
         let offset = &mut self.offset;
@@ -366,7 +364,7 @@ impl Editor {
 
         status = format!(
             "{filename} - {} lines{changed_indicator}",
-            self.document.len(), 
+            self.document.len(),
         );
         let line_indicator = format!(
             "{} | {}/{}",
@@ -398,7 +396,7 @@ impl Editor {
         }
     }
 
-    fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, IOError> 
+    fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, IOError>
     where
         C: FnMut(&mut Self, Key, &String),
     {
@@ -417,11 +415,11 @@ impl Editor {
                     if !c.is_control() {
                         result.push(c);
                     }
-                },
+                }
                 Key::Esc => {
                     result.truncate(0);
                     break;
-                },
+                }
                 _ => (),
             }
             callback(self, key, &result);
@@ -438,8 +436,7 @@ impl Editor {
 
     fn save(&mut self) {
         if self.document.filename.is_none() {
-            let new_name = self
-                .prompt("Save as: ", |_, _, _| {}).unwrap_or_default();
+            let new_name = self.prompt("Save as: ", |_, _, _| {}).unwrap_or_default();
 
             if new_name.is_none() {
                 self.status_message = StatusMessage::from("Save aborted.".to_owned());
@@ -459,32 +456,36 @@ impl Editor {
         let old_position = self.cursor_position.clone();
         let mut direction = SearchDirection::Forward;
         let query = self
-            .prompt("Search (ESC to cancel, Arrows to navigate): ", 
-            |editor, key, query| {
-                let mut moved = false;
+            .prompt(
+                "Search (ESC to cancel, Arrows to navigate): ",
+                |editor, key, query| {
+                    let mut moved = false;
 
-                match key {
-                    Key::Right | Key::Down => {
-                        direction = SearchDirection::Forward;
-                        editor.move_cursor(Key::Right);
-                        moved = true;
-                    },
-                    Key::Left | Key::Up => direction = SearchDirection::Backward,
-                    _ => direction = SearchDirection::Forward,
-                }
+                    match key {
+                        Key::Right | Key::Down => {
+                            direction = SearchDirection::Forward;
+                            editor.move_cursor(Key::Right);
+                            moved = true;
+                        }
+                        Key::Left | Key::Up => direction = SearchDirection::Backward,
+                        _ => direction = SearchDirection::Forward,
+                    }
 
-                if let Some(position) = editor
-                    .document
-                    .find(query, &editor.cursor_position, direction)
-                {
-                    editor.cursor_position = position;
-                    editor.scroll();
-                } else if moved {
-                    editor.move_cursor(Key::Left);
-                }
+                    if let Some(position) =
+                        editor
+                            .document
+                            .find(query, &editor.cursor_position, direction)
+                    {
+                        editor.cursor_position = position;
+                        editor.scroll();
+                    } else if moved {
+                        editor.move_cursor(Key::Left);
+                    }
 
-                editor.highlighted_word = Some(query.to_owned());
-            }).unwrap_or_default();
+                    editor.highlighted_word = Some(query.to_owned());
+                },
+            )
+            .unwrap_or_default();
 
         if query.is_none() {
             self.cursor_position = old_position;
@@ -497,7 +498,7 @@ impl Editor {
     fn copy_content(&mut self) -> Result<(), Box<dyn Error>> {
         let row = self.document.row(self.cursor_position.y);
 
-        match row{
+        match row {
             Some(v) => self.clipboard.set_contents(v.as_string().to_owned()),
             None => Err(Box::new(CopyError("content was empty".to_owned()))),
         }
@@ -514,7 +515,7 @@ impl Editor {
                 }
 
                 Ok(v)
-            },
+            }
             Err(err) => Err(err),
         }
     }

@@ -1,11 +1,11 @@
 use crate::Position;
 
-use std::io::{stdin, stdout, Stdout, Write, Error};
-use termion::terminal_size;
+use std::io::{stdin, stdout, Error, Stdout, Write};
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
-use termion::{clear, cursor, color};
+use termion::terminal_size;
+use termion::{clear, color, cursor};
 
 pub struct Size {
     pub width: u16,
@@ -19,7 +19,7 @@ pub struct Terminal {
 
 impl Terminal {
     /// # Errors
-    /// 
+    ///
     /// Will return `Error` if it fails to get terminal size  
     /// or if it fails to switch to raw mode
     pub fn new() -> Result<Self, Error> {
@@ -57,16 +57,16 @@ impl Terminal {
     }
 
     /// # Errors
-    /// 
-    /// Will return an error if not 
-    /// all bytes could be written due to I/O errors 
+    ///
+    /// Will return an error if not
+    /// all bytes could be written due to I/O errors
     /// or EOF being reached.
     pub fn flush() -> Result<(), Error> {
         stdout().flush()
     }
 
     /// # Errors
-    /// 
+    ///
     /// Will return an error if it fails to read key
     pub fn read_key() -> Result<Key, Error> {
         loop {
@@ -103,5 +103,4 @@ impl Terminal {
     pub fn reset_fg_color() {
         print!("{}", color::Fg(color::Reset));
     }
-
 }
