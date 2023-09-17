@@ -20,7 +20,11 @@ pub mod errors {
 
     impl Display for RowDeletionError {
         fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-            write!(f, "cannot delete at position x: {}, y: {}", &self.0, &self.1)
+            write!(
+                f,
+                "cannot delete at position x: {}, y: {}",
+                &self.0, &self.1
+            )
         }
     }
 

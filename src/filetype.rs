@@ -63,10 +63,11 @@ impl FileType {
     pub fn from(filename: &str) -> Self {
         if Path::new(filename)
             .extension()
-            .map_or(false, |ext| ext.eq_ignore_ascii_case("rs")) {
+            .map_or(false, |ext| ext.eq_ignore_ascii_case("rs"))
+        {
             return Self {
                 name: String::from("Rust"),
-                hl_opts: HighlightOptions { 
+                hl_opts: HighlightOptions {
                     numbers: true,
                     strings: true,
                     char: true,
@@ -165,6 +166,6 @@ impl FileType {
     }
 
     pub fn highlight_options(&self) -> &HighlightOptions {
-       &self.hl_opts
+        &self.hl_opts
     }
 }

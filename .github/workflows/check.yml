@@ -1,4 +1,4 @@
-name: build
+name: check
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
           cargo clippy --all-targets --all-features
     
 
-  build:
+  check:
     runs-on: ubuntu-latest
 
     steps:
@@ -38,6 +38,6 @@ jobs:
         profile: minimal
         toolchain: stable
     
-    - name: Build code
+    - name: Run Check
       run: |
-        cargo build --verbose --release
+        cargo check --verbose --release

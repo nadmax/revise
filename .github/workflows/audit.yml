@@ -1,0 +1,29 @@
+name: audit
+
+on:
+  push:
+    branches:
+    -  master
+  pull_request:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+    
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: Install Audit
+        run: |
+          cargo install cargo-audit
+        
+      - name: Run Audit
+        run: |
+          cargo audit -q
