@@ -1,4 +1,4 @@
-![audit](https://github.com/nadmax/editor/actions/workflows/audit.yml/badge.svg) ![build](https://github.com/nadmax/editor/actions/workflows/build.yml/badge.svg) ![test](https://github.com/nadmax/editor/actions/workflows/test.yml/badge.svg)
+![audit](https://github.com/nadmax/editor/actions/workflows/audit.yml/badge.svg) ![check](https://github.com/nadmax/editor/actions/workflows/check.yml/badge.svg) ![test](https://github.com/nadmax/editor/actions/workflows/test.yml/badge.svg)
 
 # Editor
 
