@@ -1,9 +1,13 @@
+use crate::keywords;
 use std::path::Path;
+use std::error::Error as Err;
+use thiserror::Error;
 
 #[derive(Default)]
 pub struct HighlightOptions {
     numbers: bool,
     strings: bool,
+    boolean: bool,
     char: bool,
     comments: bool,
     multiline_comments: bool,
@@ -16,6 +20,10 @@ pub struct FileType {
     hl_opts: HighlightOptions,
 }
 
+#[derive(Debug, Error)]
+#[error("failed to parse extension from filename: {0}")]
+struct ParseExtensionError(String);
+
 impl HighlightOptions {
     pub fn numbers(&self) -> bool {
         self.numbers
@@ -27,6 +35,10 @@ impl HighlightOptions {
 
     pub fn char(&self) -> bool {
         self.char
+    }
+
+    pub fn boolean(&self) -> bool {
+        self.boolean
     }
 
     pub fn comments(&self) -> bool {
@@ -56,116 +68,60 @@ impl Default for FileType {
 }
 
 impl FileType {
+    pub fn new() -> Self {
+        Self {
+            name: String::new(),
+            hl_opts: HighlightOptions::default(),
+        }
+    }
+
     pub fn name(&self) -> String {
         self.name.clone()
     }
-
-    pub fn from(filename: &str) -> Self {
-        if Path::new(filename)
-            .extension()
-            .map_or(false, |ext| ext.eq_ignore_ascii_case("rs"))
-        {
-            return Self {
-                name: String::from("Rust"),
-                hl_opts: HighlightOptions {
-                    numbers: true,
-                    strings: true,
-                    char: true,
-                    comments: true,
-                    multiline_comments: true,
-                    primary_keywords: vec![
-                        "as".to_owned(),
-                        "break".to_owned(),
-                        "const".to_owned(),
-                        "continue".to_owned(),
-                        "crate".to_owned(),
-                        "else".to_owned(),
-                        "enum".to_owned(),
-                        "extern".to_owned(),
-                        "false".to_owned(),
-                        "fn".to_owned(),
-                        "for".to_owned(),
-                        "if".to_owned(),
-                        "impl".to_owned(),
-                        "in".to_owned(),
-                        "let".to_owned(),
-                        "loop".to_owned(),
-                        "match".to_owned(),
-                        "mod".to_owned(),
-                        "move".to_owned(),
-                        "mut".to_owned(),
-                        "pub".to_owned(),
-                        "ref".to_owned(),
-                        "return".to_owned(),
-                        "self".to_owned(),
-                        "Self".to_owned(),
-                        "static".to_owned(),
-                        "struct".to_owned(),
-                        "super".to_owned(),
-                        "trait".to_owned(),
-                        "true".to_owned(),
-                        "true".to_owned(),
-                        "type".to_owned(),
-                        "unsafe".to_owned(),
-                        "use".to_owned(),
-                        "where".to_owned(),
-                        "while".to_owned(),
-                        "dyn".to_owned(),
-                        "abstract".to_owned(),
-                        "become".to_owned(),
-                        "box".to_owned(),
-                        "do".to_owned(),
-                        "final".to_owned(),
-                        "macro".to_owned(),
-                        "override".to_owned(),
-                        "priv".to_owned(),
-                        "typeof".to_owned(),
-                        "unsized".to_owned(),
-                        "virtual".to_owned(),
-                        "yield".to_owned(),
-                        "async".to_owned(),
-                        "await".to_owned(),
-                        "try".to_owned(),
-                    ],
-                    secondary_keywords: vec![
-                        "bool".to_owned(),
-                        "char".to_owned(),
-                        "i8".to_owned(),
-                        "i16".to_owned(),
-                        "i32".to_owned(),
-                        "i64".to_owned(),
-                        "isize".to_owned(),
-                        "u8".to_owned(),
-                        "u16".to_owned(),
-                        "u32".to_owned(),
-                        "u64".to_owned(),
-                        "usize".to_owned(),
-                        "f32".to_owned(),
-                        "f64".to_owned(),
-                        "String".to_owned(),
-                        "&str".to_owned(),
-                        "Vec".to_owned(),
-                        "std".to_owned(),
-                        "core".to_owned(),
-                        "alloc".to_owned(),
-                        "Result".to_owned(),
-                        "Box".to_owned(),
-                        "Error".to_owned(),
-                        "Option".to_owned(),
-                        "Default".to_owned(),
-                        "Clone".to_owned(),
-                        "Copy".to_owned(),
-                        "PartialEq".to_owned(),
-                        "Debug".to_owned(),
-                    ],
-                },
-            };
+    
+    pub fn from(&self, filename: &str) -> Self {
+        match self.parse_extension(filename) {
+            Ok(ext) => match ext.as_str() {
+                "rs" => return self.create_file_type("Rust"),
+                "toml" => return self.create_file_type("Toml"),
+                "lock" => return self.create_file_type("Lock"),
+                "md" => return self.create_file_type("Markdown"),
+                "yml" => return self.create_file_type("YAML"),
+                _ => Self::default(),
+            }
+            Err(_) => return self.create_file_type(filename),
         }
-
-        Self::default()
     }
 
     pub fn highlight_options(&self) -> &HighlightOptions {
         &self.hl_opts
+    }
+
+    fn parse_extension(&self, filename: &str) -> Result<String, Box<dyn Err>> {
+        let path = Path::new(filename);
+    
+        match path.extension() {
+            Some(ext) => match ext.to_str() {
+                Some(ext) => return Ok(ext.to_owned()),
+                None => return Err(Box::new(ParseExtensionError(filename.to_owned()))),
+            },
+            None => return Err(Box::new(ParseExtensionError(filename.to_owned()))),
+        }
+    }
+
+    fn create_file_type(&self, file_type: &str) -> Self {
+        Self {
+            name: String::from(file_type),
+            hl_opts: HighlightOptions {
+                numbers: true,
+                strings: true,
+                boolean: true,
+                char: true,
+                comments: true,
+                multiline_comments: true,
+                primary_keywords: keywords::rust::primary_keywords(),
+                secondary_keywords: keywords::rust::secondary_keywords(),
+            },
+        }
     }
 }

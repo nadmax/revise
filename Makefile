@@ -14,6 +14,9 @@ build:
 check:
 	@cargo check $(RELEASE)
 
+fmt:
+	@cargo fmt
+
 help:
 	@echo "build (release=yes)     Compile editor project"
 	@echo "check (release=yes)     Check warning and errors"
