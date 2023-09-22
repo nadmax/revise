@@ -9,10 +9,13 @@ ifeq ($(release), yes)
 endif
 
 build:
-	cargo build $(RELEASE)
+	@cargo build $(RELEASE)
 
 check:
 	@cargo check $(RELEASE)
+
+fmt:
+	@cargo fmt
 
 help:
 	@echo "build (release=yes)     Compile editor project"
