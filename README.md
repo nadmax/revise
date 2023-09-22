@@ -2,7 +2,7 @@
 
 # Editor
 
-A simple text editor written in Rust.
+A minimalist text editor written in Rust.
 
 ![Editor example](https://github.com/nadmax/editor/blob/master/static/editor.png)
 
