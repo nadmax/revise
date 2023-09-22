@@ -23,7 +23,7 @@ impl Document {
     /// Will return `Error` if it fails read filename
     pub fn open(filename: &str) -> Result<Self, IOError> {
         let contents = read_to_string(filename)?;
-        let file_type = FileType::from(filename);
+        let file_type = FileType::new().from(filename);
         let mut rows = Vec::new();
 
         for value in contents.lines() {
@@ -129,7 +129,7 @@ impl Document {
     pub fn save(&mut self) -> Result<(), IOError> {
         if let Some(filename) = &self.filename {
             let mut file = File::create(filename)?;
-            self.file_type = FileType::from(filename);
+            self.file_type = FileType::new().from(filename);
 
             for row in &mut self.rows {
                 file.write_all(row.as_bytes())?;
