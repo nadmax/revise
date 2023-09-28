@@ -1,4 +1,9 @@
 use termion::color;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+#[error("cannot highlight content")]
+pub struct HighlightError;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Type {

@@ -4,6 +4,7 @@ use crate::SearchDirection;
 
 use std::cmp;
 use termion::color;
+use thiserror::Error;
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Default)]
@@ -12,6 +13,14 @@ pub struct Row {
     string: String,
     len: usize,
     highlight: Vec<highlight::Type>,
+}
+
+#[derive(Debug, Error)]
+pub enum RowError {
+    #[error("cannot insert at position x: {0}, y: {1}")]
+    InsertionError(usize, usize),
+    #[error("cannot delete at position x: {0}, y: {1}")]
+    DeletionError(usize, usize),
 }
 
 impl From<&str> for Row {

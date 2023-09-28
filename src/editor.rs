@@ -1,15 +1,15 @@
-use crate::CopyError;
 use crate::Document;
 use crate::Row;
 use crate::Terminal;
 
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use std::env;
-use std::error::Error;
+use std::error::Error as Err;
 use std::io::Error as IOError;
 use std::time::{Duration, Instant};
 use termion::color;
 use termion::event::Key;
+use thiserror::Error;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
@@ -54,8 +54,12 @@ pub struct Editor {
     clipboard: ClipboardContext,
 }
 
+#[derive(Debug, Error)]
+#[error("Cannot copy content")]
+pub struct CopyError;
+
 impl Editor {
-    pub fn new() -> Result<Self, Box<dyn Error>> {
+    pub fn new() -> Result<Self, Box<dyn Err>> {
         let args: Vec<String> = env::args().collect();
         let mut initial_status =
             String::from("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
@@ -88,10 +92,13 @@ impl Editor {
         })
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Result<(), Box<dyn Err>> {
         loop {
             if let Err(error) = self.refresh_screen() {
-                die(error);
+                match self.clipboard.clear() {
+                    Ok(_) => return Err(error),
+                    Err(e) => return Err(e),
+                }
             }
 
             if self.should_quit {
@@ -99,9 +106,14 @@ impl Editor {
             }
 
             if let Err(error) = self.process_keypress() {
-                die(Box::new(error));
+                match self.clipboard.clear() {
+                    Ok(_) => return Err(Box::new(error)),
+                    Err(e) => return Err(e),
+                }
             }
         }
+
+        Ok(())
     }
 
     pub fn draw_row(&self, row: &Row) {
@@ -121,7 +133,7 @@ impl Editor {
                 Ok(_) => (),
                 Err(err) => {
                     self.status_message =
-                        StatusMessage::from(format!("Failed to copy content: {err}"))
+                        StatusMessage::from(format!("{err}"))
                 }
             },
             Key::Ctrl('v') => match self.paste_content() {
@@ -207,7 +219,7 @@ impl Editor {
         Ok(())
     }
 
-    fn refresh_screen(&mut self) -> Result<(), Box<dyn Error>> {
+    fn refresh_screen(&mut self) -> Result<(), Box<dyn Err>> {
         Terminal::cursor_hide();
         Terminal::cursor_position(&Position::default());
 
@@ -413,7 +425,7 @@ impl Editor {
         }
     }
 
-    fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, Box<dyn Error>>
+    fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, Box<dyn Err>>
     where
         C: FnMut(&mut Self, Key, &String),
     {
@@ -512,16 +524,16 @@ impl Editor {
         self.highlighted_word = None;
     }
 
-    fn copy_content(&mut self) -> Result<(), Box<dyn Error>> {
+    fn copy_content(&mut self) -> Result<(), Box<dyn Err>> {
         let row = self.document.row(self.cursor_position.y);
 
         match row {
             Some(v) => self.clipboard.set_contents(v.as_string().to_owned()),
-            None => Err(Box::new(CopyError("content was empty".to_owned()))),
+            None => Err(Box::new(CopyError)),
         }
     }
 
-    fn paste_content(&mut self) -> Result<String, Box<dyn Error>> {
+    fn paste_content(&mut self) -> Result<String, Box<dyn Err>> {
         let content = self.clipboard.get_contents();
 
         match content {
@@ -536,10 +548,4 @@ impl Editor {
             Err(err) => Err(err),
         }
     }
-}
-
-fn die(err: Box<dyn Error>) {
-    Terminal::clear_screen();
-
-    panic!("{}", err)
 }

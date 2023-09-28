@@ -1,9 +1,8 @@
+use crate::highlight::HighlightError;
+use crate::row::RowError;
 use crate::FileType;
-use crate::HighlightError;
 use crate::Position;
 use crate::Row;
-use crate::RowDeletionError;
-use crate::RowInsertionError;
 use crate::SearchDirection;
 
 use std::error::Error;
@@ -75,7 +74,7 @@ impl Document {
 
             match row {
                 Some(r) => r.insert(at.x, c),
-                None => return Err(Box::new(RowInsertionError(at.x, at.y))),
+                None => return Err(Box::new(RowError::InsertionError(at.x, at.y))),
             }
         }
 
@@ -105,14 +104,14 @@ impl Document {
 
                     match row {
                         Some(r) => r.append(&next_row),
-                        None => return Err(Box::new(RowDeletionError(at.x, at.y))),
+                        None => return Err(Box::new(RowError::DeletionError(at.x, at.y))),
                     }
                 } else {
                     let row = self.rows.get_mut(at.y);
 
                     match row {
                         Some(r) => r.delete(at.x),
-                        None => return Err(Box::new(RowDeletionError(at.x, at.y))),
+                        None => return Err(Box::new(RowError::DeletionError(at.x, at.y))),
                     }
                 }
 
@@ -120,7 +119,7 @@ impl Document {
 
                 Ok(())
             }
-            None => Err(Box::new(RowDeletionError(at.x, at.y))),
+            None => Err(Box::new(RowError::DeletionError(at.x, at.y))),
         }
     }
 
@@ -246,7 +245,7 @@ impl Document {
 
                 Ok(())
             }
-            None => return Err(Box::new(RowInsertionError(at.x, at.y))),
+            None => return Err(Box::new(RowError::InsertionError(at.x, at.y))),
         }
     }
 
