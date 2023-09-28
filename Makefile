@@ -9,7 +9,7 @@ ifeq ($(release), yes)
 endif
 
 build:
-	cargo build $(RELEASE)
+	@cargo build $(RELEASE)
 
 check:
 	@cargo check $(RELEASE)
