@@ -1,6 +1,6 @@
 use crate::keywords;
-use std::path::Path;
 use std::error::Error as Err;
+use std::path::Path;
 use thiserror::Error;
 
 #[derive(Default)]
@@ -78,7 +78,7 @@ impl FileType {
     pub fn name(&self) -> String {
         self.name.clone()
     }
-    
+
     pub fn from(&self, filename: &str) -> Self {
         match self.parse_extension(filename) {
             Ok(ext) => match ext.as_str() {
@@ -88,7 +88,7 @@ impl FileType {
                 "md" => return self.create_file_type("Markdown"),
                 "yml" => return self.create_file_type("YAML"),
                 _ => Self::default(),
-            }
+            },
             Err(_) => return self.create_file_type(filename),
         }
     }
@@ -99,7 +99,7 @@ impl FileType {
 
     fn parse_extension(&self, filename: &str) -> Result<String, Box<dyn Err>> {
         let path = Path::new(filename);
-    
+
         match path.extension() {
             Some(ext) => match ext.to_str() {
                 Some(ext) => return Ok(ext.to_owned()),

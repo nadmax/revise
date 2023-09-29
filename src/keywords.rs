@@ -1,6 +1,7 @@
 pub mod rust {
     pub fn primary_keywords() -> Vec<String> {
-        vec!["as".to_owned(),
+        vec![
+            "as".to_owned(),
             "break".to_owned(),
             "const".to_owned(),
             "continue".to_owned(),
