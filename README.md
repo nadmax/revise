@@ -12,9 +12,9 @@ In order to use Editor, you only need Rust.
 See [Installation Guide](https://www.rust-lang.org/tools/install)
 
 ## Usage
-A Makefile is available at project root. You can run the following command to get the helper.
+Run the following command to use Editor
 ```
-make help
+cargo run <file>
 ```
 
 ## Contributing

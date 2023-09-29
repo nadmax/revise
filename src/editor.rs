@@ -3,7 +3,7 @@ use crate::Row;
 use crate::Terminal;
 
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
-use std::env;
+use std::env::{self, Args};
 use std::error::Error as Err;
 use std::io::Error as IOError;
 use std::time::{Duration, Instant};
@@ -60,18 +60,24 @@ pub struct CopyError;
 
 impl Editor {
     pub fn new() -> Result<Self, Box<dyn Err>> {
-        let args: Vec<String> = env::args().collect();
+        let mut args: Args = env::args();
         let mut initial_status =
             String::from("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
         let document = if args.len() > 1 {
-            let filename = &args[1];
-            let doc = Document::open(filename);
+            let filename = args.nth(1);
 
-            if let Ok(content) = doc {
-                content
-            } else {
-                initial_status = format!("ERR: Could not open file: {filename}");
-                Document::default()
+            match filename {
+                Some(f) => {
+                    let doc = Document::open(f.as_str());
+
+                    if let Ok(content) = doc {
+                        content
+                    } else {
+                        initial_status = format!("ERR: Could not open file: {f}");
+                        Document::default()
+                    }
+                }
+                None => Document::default(),
             }
         } else {
             Document::default()
@@ -131,10 +137,7 @@ impl Editor {
         match pressed_key {
             Key::Ctrl('c') => match self.copy_content() {
                 Ok(_) => (),
-                Err(err) => {
-                    self.status_message =
-                        StatusMessage::from(format!("{err}"))
-                }
+                Err(err) => self.status_message = StatusMessage::from(format!("{err}")),
             },
             Key::Ctrl('v') => match self.paste_content() {
                 Ok(v) => {

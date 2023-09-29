@@ -3,9 +3,9 @@ mod document;
 mod editor;
 mod filetype;
 mod highlight;
+mod keywords;
 mod row;
 mod terminal;
-mod keywords;
 
 pub use document::Document;
 use editor::Editor;
