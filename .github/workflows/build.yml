@@ -25,7 +25,7 @@ jobs:
           cargo clippy --all-targets --all-features
     
 
-  check:
+  build:
     runs-on: ubuntu-latest
 
     steps:
