@@ -42,7 +42,7 @@ impl StatusMessage {
     }
 }
 
-pub struct Editor {
+pub struct Revise {
     should_quit: bool,
     terminal: Terminal,
     cursor_position: Position,
@@ -58,7 +58,7 @@ pub struct Editor {
 #[error("Cannot copy content")]
 pub struct CopyError;
 
-impl Editor {
+impl Revise {
     pub fn new() -> Result<Self, Box<dyn Err>> {
         let mut args: Args = env::args();
         let mut initial_status =
@@ -278,7 +278,7 @@ impl Editor {
     }
 
     fn draw_welcome_message(&self) {
-        let mut welcome_message = format!("Editor -- version {VERSION}");
+        let mut welcome_message = format!("revise -- version {VERSION}");
         let width = self.terminal.size().width as usize;
         let len = welcome_message.len();
         let padding = width.saturating_sub(len) / 2;
@@ -490,13 +490,13 @@ impl Editor {
         let query = self
             .prompt(
                 "Search (ESC to cancel, Arrows to navigate): ",
-                |editor, key, query| {
+                |revise, key, query| {
                     let mut moved = false;
 
                     match key {
                         Key::Right | Key::Down => {
                             direction = SearchDirection::Forward;
-                            editor.move_cursor(Key::Right);
+                            revise.move_cursor(Key::Right);
                             moved = true;
                         }
                         Key::Left | Key::Up => direction = SearchDirection::Backward,
@@ -504,17 +504,17 @@ impl Editor {
                     }
 
                     if let Some(position) =
-                        editor
+                        revise
                             .document
-                            .find(query, &editor.cursor_position, direction)
+                            .find(query, &revise.cursor_position, direction)
                     {
-                        editor.cursor_position = position;
-                        editor.scroll();
+                        revise.cursor_position = position;
+                        revise.scroll();
                     } else if moved {
-                        editor.move_cursor(Key::Left);
+                        revise.move_cursor(Key::Left);
                     }
 
-                    editor.highlighted_word = Some(query.to_owned());
+                    revise.highlighted_word = Some(query.to_owned());
                 },
             )
             .unwrap_or_default();

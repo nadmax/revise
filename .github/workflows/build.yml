@@ -1,4 +1,4 @@
-name: check
+name: build
 
 on:
   push:
@@ -38,6 +38,6 @@ jobs:
         profile: minimal
         toolchain: stable
     
-    - name: Run Check
+    - name: Run Build
       run: |
-        cargo check --verbose --release
+        cargo build --verbose --release

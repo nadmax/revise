@@ -90,16 +90,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 
 [[package]]
-name = "editor"
-version = "0.1.0"
-dependencies = [
- "cli-clipboard",
- "termion",
- "thiserror",
- "unicode-segmentation",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -366,6 +356,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8440d8acb4fd3d277125b4bd01a6f38aee8d814b3b5fc09b3f2b825d37d3fe8f"
 dependencies = [
  "redox_syscall 0.2.16",
+]
+
+[[package]]
+name = "revise"
+version = "0.1.0"
+dependencies = [
+ "cli-clipboard",
+ "termion",
+ "thiserror",
+ "unicode-segmentation",
 ]
 
 [[package]]
