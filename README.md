@@ -14,7 +14,7 @@ See [Installation Guide](https://www.rust-lang.org/tools/install)
 ## Installation
 Run the following command to install Revise
 ```
-cargo install revise --version 0.0.0-beta
+cargo install revise --version 0.1.0
 ```
 
 ## Usage
