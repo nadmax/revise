@@ -35,7 +35,6 @@ impl From<&str> for Row {
 }
 
 impl Row {
-    #[must_use]
     pub fn render(&self, start: usize, end: usize) -> String {
         let end = cmp::min(end, self.string.len());
         let start = cmp::min(start, end);
@@ -73,13 +72,11 @@ impl Row {
 
         result
     }
-
-    #[must_use]
+    
     pub fn len(&self) -> usize {
         self.len
     }
 
-    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
@@ -134,7 +131,6 @@ impl Row {
         self.len += new.len;
     }
 
-    #[must_use]
     pub fn split(&mut self, at: usize) -> Self {
         let mut row: String = String::new();
         let mut length = 0;
@@ -163,12 +159,10 @@ impl Row {
         }
     }
 
-    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.string.as_bytes()
     }
-
-    #[must_use]
+    
     pub fn find(&self, query: &str, at: usize, direction: SearchDirection) -> Option<usize> {
         if at > self.len {
             return None;
@@ -467,7 +461,7 @@ impl Row {
         hl_type: highlight::Type,
     ) -> bool {
         if *index > 0 {
-            let prev_char = chars.get(*index + 1);
+            let prev_char = chars.get(*index - 1);
 
             match prev_char {
                 Some(c) => {
