@@ -8,13 +8,19 @@ A minimalist text editor written in Rust.
 
 ## Prerequisites
 
-In order to use revise, you only need Rust.  
+In order to use revise, you need to install Cargo.
 See [Installation Guide](https://www.rust-lang.org/tools/install)
 
-## Usage
-Run the following command to use Revise
+## Installation
+Run the following command to install Revise
 ```
-cargo run <file>
+cargo install revise --version 0.0.0-beta
+```
+
+## Usage
+To start using Revise, run the following command
+```
+revise <file>
 ```
 
 ## Contributing

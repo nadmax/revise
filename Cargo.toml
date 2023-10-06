@@ -9,7 +9,7 @@ homepage = "https://github.com/nadmax/revise"
 keywords = ["cli", "text-editor", "linux"]
 readme = "README.md"
 repository = "https://github.com/nadmax/revise"
-categories = ["Text editors"]
+categories = ["text-editor", "development-tools", "cli"]
 
 [dependencies]
 termion = "2.0.1"
