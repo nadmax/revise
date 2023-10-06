@@ -4,7 +4,7 @@
 
 A minimalist text editor written in Rust.
 
-<img width=840 height=400 src="https://github.com/nadmax/revise/blob/master/static/revise.png?raw=true" alt="Revise editor screenshot"/>
+<img width=840 height=310 src="https://github.com/nadmax/revise/blob/master/static/revise.png?raw=true" alt="Revise editor screenshot"/>
 
 ## Prerequisites
 

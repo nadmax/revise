@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 description = "A minimalist text editor"
 homepage = "https://github.com/nadmax/revise"
 keywords = ["cli", "text-editor", "linux"]
-readme = "README.md"
+readme = "CARGO.md"
 repository = "https://github.com/nadmax/revise"
 categories = ["text-editors", "development-tools", "command-line-interface"]
 
