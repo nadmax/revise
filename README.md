@@ -4,7 +4,7 @@
 
 A minimalist text editor written in Rust.
 
-![revise example](https://github.com/nadmax/revise/blob/master/static/revise.png)
+<img width=1180 height=626 src="https://github.com/nadmax/revise/blob/master/static/revise.png?raw=true" alt="Revise editor screenshot"/>
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ See [Installation Guide](https://www.rust-lang.org/tools/install)
 ## Installation
 Run the following command to install Revise
 ```
-cargo install revise --version 0.1.0
+cargo install revise --version 0.1.1
 ```
 
 ## Usage

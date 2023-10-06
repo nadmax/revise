@@ -278,7 +278,7 @@ impl Revise {
     }
 
     fn draw_welcome_message(&self) {
-        let mut welcome_message = format!("revise -- version {VERSION}");
+        let mut welcome_message = format!("Revise | v{VERSION}");
         let width = self.terminal.size().width as usize;
         let len = welcome_message.len();
         let padding = width.saturating_sub(len) / 2;
