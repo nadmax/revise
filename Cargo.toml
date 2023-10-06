@@ -1,6 +1,6 @@
 [package]
 name = "revise"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = ["nadmax <n.maximilien1@gmail.com>"]
 license = "MIT OR Apache-2.0"
@@ -9,7 +9,7 @@ homepage = "https://github.com/nadmax/revise"
 keywords = ["cli", "text-editor", "linux"]
 readme = "README.md"
 repository = "https://github.com/nadmax/revise"
-categories = ["text-editors", "development-tools"]
+categories = ["text-editors", "development-tools", "command-line-interface"]
 
 [dependencies]
 termion = "2.0.1"
