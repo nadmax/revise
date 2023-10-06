@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "revise"
-version = "0.0.0-beta"
+version = "0.1.0"
 dependencies = [
  "cli-clipboard",
  "termion",
