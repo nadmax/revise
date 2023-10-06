@@ -87,6 +87,7 @@ pub mod rust {
             "Copy".to_owned(),
             "PartialEq".to_owned(),
             "Debug".to_owned(),
+            "Instant".to_owned(),
         ]
     }
 }
