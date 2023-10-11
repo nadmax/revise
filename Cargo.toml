@@ -1,9 +1,9 @@
 [package]
 name = "revise"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["nadmax <n.maximilien1@gmail.com>"]
-license = "MIT OR Apache-2.0"
+license = "MIT"
 description = "A minimalist text editor"
 homepage = "https://github.com/nadmax/revise"
 keywords = ["cli", "text-editor", "linux"]
