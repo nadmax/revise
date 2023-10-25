@@ -1,6 +1,6 @@
 [package]
 name = "revise"
-version = "0.1.5"
+version = "0.2.0"
 edition = "2021"
 authors = ["nadmax <n.maximilien1@gmail.com>"]
 license = "MIT"
@@ -12,7 +12,7 @@ repository = "https://github.com/nadmax/revise"
 categories = ["text-editors", "development-tools", "command-line-interface"]
 
 [dependencies]
-termion = "2.0.1"
+crossterm = "0.27.0"
 unicode-segmentation = "1.10.1"
 cli-clipboard = "0.4.0"
 thiserror = "1.0.49"

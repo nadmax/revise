@@ -1,16 +1,16 @@
 #![warn(clippy::all)]
-mod document;
 mod application;
+mod document;
 mod filetype;
 mod highlight;
 mod keywords;
 mod row;
 mod terminal;
 
-pub use document::Document;
-use application::Revise;
 pub use application::Position;
+use application::Revise;
 pub use application::SearchDirection;
+pub use document::Document;
 pub use filetype::FileType;
 pub use filetype::HighlightOptions;
 pub use row::Row;

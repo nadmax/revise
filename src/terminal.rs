@@ -1,11 +1,13 @@
 use crate::Position;
 
-use std::io::{stdin, stdout, Error, Stdout, Write};
-use termion::event::Key;
-use termion::input::TermRead;
-use termion::raw::{IntoRawMode, RawTerminal};
-use termion::terminal_size;
-use termion::{clear, color, cursor};
+use crossterm::cursor;
+use crossterm::event::{self, Event};
+use crossterm::execute;
+use crossterm::style::Color;
+use crossterm::style::{ResetColor, SetBackgroundColor, SetForegroundColor};
+use crossterm::terminal as CrossTerminal;
+use std::io::{stdout, Error, Stdout, Write};
+use std::time::Duration;
 
 pub struct Size {
     pub width: u16,
@@ -14,7 +16,7 @@ pub struct Size {
 
 pub struct Terminal {
     size: Size,
-    _stdout: RawTerminal<Stdout>,
+    _stdout: Stdout,
 }
 
 impl Terminal {
@@ -23,15 +25,19 @@ impl Terminal {
     /// Will return `Error` if it fails to get terminal size  
     /// or if it fails to switch to raw mode
     pub fn new() -> Result<Self, Error> {
-        let size = terminal_size()?;
+        CrossTerminal::enable_raw_mode()?;
+        let size = CrossTerminal::size();
 
-        Ok(Self {
-            size: Size {
-                width: size.0,
-                height: size.1.saturating_sub(2),
-            },
-            _stdout: stdout().into_raw_mode()?,
-        })
+        match size {
+            Ok(s) => Ok(Self {
+                size: Size {
+                    width: s.0,
+                    height: s.1,
+                },
+                _stdout: stdout(),
+            }),
+            Err(err) => Err(err),
+        }
     }
 
     pub fn size(&self) -> &Size {
@@ -39,20 +45,22 @@ impl Terminal {
     }
 
     pub fn clear_screen() {
-        print!("{}", clear::All);
+        let _ = execute!(
+            stdout(),
+            CrossTerminal::Clear(CrossTerminal::ClearType::All)
+        );
     }
 
     #[allow(clippy::cast_possible_truncation)]
     pub fn cursor_position(position: &Position) {
-        let Position { mut x, mut y } = position;
+        let Position { mut x, y } = position;
 
         x = x.saturating_add(1);
-        y = y.saturating_add(1);
 
         let x = x as u16;
-        let y = y as u16;
+        let y = *y as u16;
 
-        print!("{}", cursor::Goto(x, y));
+        let _ = execute!(stdout(), cursor::MoveTo(x, y));
     }
 
     /// # Errors
@@ -66,40 +74,39 @@ impl Terminal {
 
     /// # Errors
     ///
-    /// Will return an error if it fails to read key
-    pub fn read_key() -> Result<Key, Error> {
+    /// Will return an error if it fails to read an event
+    pub fn read_event() -> Result<Event, Error> {
         loop {
-            if let Some(key) = stdin().lock().keys().next() {
-                return key;
+            if event::poll(Duration::from_millis(500))? {
+                return event::read();
             }
         }
     }
 
     pub fn cursor_hide() {
-        print!("{}", cursor::Hide);
+        let _ = execute!(stdout(), cursor::Hide);
     }
 
     pub fn cursor_show() {
-        print!("{}", cursor::Show);
+        let _ = execute!(stdout(), cursor::Show);
     }
 
     pub fn clear_current_line() {
-        print!("{}", clear::CurrentLine);
+        let _ = execute!(
+            stdout(),
+            CrossTerminal::Clear(CrossTerminal::ClearType::CurrentLine)
+        );
     }
 
-    pub fn set_bg_color(color: color::Rgb) {
-        print!("{}", color::Bg(color));
+    pub fn set_bg_color(color: Color) {
+        let _ = execute!(stdout(), SetBackgroundColor(color));
     }
 
-    pub fn reset_bg_color() {
-        print!("{}", color::Bg(color::Reset));
+    pub fn reset_color() {
+        let _ = execute!(stdout(), ResetColor);
     }
 
-    pub fn set_fg_color(color: color::Rgb) {
-        print!("{}", color::Fg(color));
-    }
-
-    pub fn reset_fg_color() {
-        print!("{}", color::Fg(color::Reset));
+    pub fn set_fg_color(color: Color) {
+        let _ = execute!(stdout(), SetForegroundColor(color));
     }
 }

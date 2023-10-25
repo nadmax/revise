@@ -3,17 +3,28 @@ use crate::Row;
 use crate::Terminal;
 
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+use crossterm::style::{Color, Print};
+use crossterm::execute;
+use crossterm::terminal as CrossTerminal;
 use std::env::{self, Args};
 use std::error::Error as Err;
 use std::io::Error as IOError;
+use std::io::stdout;
 use std::time::{Duration, Instant};
-use termion::color;
-use termion::event::Key;
 use thiserror::Error;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
-const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
+const STATUS_FG_COLOR: Color = Color::Rgb {
+    r: 63,
+    g: 63,
+    b: 63,
+};
+const STATUS_BG_COLOR: Color = Color::Rgb {
+    r: 239,
+    g: 239,
+    b: 239,
+};
 const QUIT_TIME: u8 = 1;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -57,6 +68,12 @@ pub struct Revise {
 #[derive(Debug, Error)]
 #[error("Cannot copy content")]
 pub struct CopyError;
+
+impl Drop for Revise {
+    fn drop(&mut self) {
+        CrossTerminal::disable_raw_mode().expect("unable to turn off raw mode");
+    }
+}
 
 impl Revise {
     pub fn new() -> Result<Self, Box<dyn Err>> {
@@ -111,7 +128,7 @@ impl Revise {
                 break;
             }
 
-            if let Err(error) = self.process_keypress() {
+            if let Err(error) = self.process_event() {
                 match self.clipboard.clear() {
                     Ok(_) => return Err(Box::new(error)),
                     Err(e) => return Err(e),
@@ -128,80 +145,124 @@ impl Revise {
         let end = start.saturating_add(width);
         let row = row.render(start, end);
 
-        println!("{row}\r");
+        execute!(stdout(), Print(row)).unwrap();
     }
 
-    fn process_keypress(&mut self) -> Result<(), IOError> {
-        let pressed_key = Terminal::read_key()?;
+    fn process_event(&mut self) -> Result<(), IOError> {
+        let event = Terminal::read_event()?;
 
-        match pressed_key {
-            Key::Ctrl('c') => match self.copy_content() {
-                Ok(_) => (),
-                Err(err) => self.status_message = StatusMessage::from(format!("{err}")),
-            },
-            Key::Ctrl('v') => match self.paste_content() {
-                Ok(v) => {
-                    for c in v.chars().rev() {
-                        match self.document.insert(&self.cursor_position, c) {
-                            Ok(_) => (),
-                            Err(err) => {
-                                self.status_message =
-                                    StatusMessage::from(format!("Failed to paste content: {err}"))
-                            }
-                        }
-                    }
-                }
-                Err(err) => {
-                    self.status_message =
-                        StatusMessage::from(format!("Failed to paste content: {err}"))
-                }
-            },
-            Key::Ctrl('q') => return self.quit(),
-            Key::Ctrl('s') => self.save(),
-            Key::Ctrl('f') => self.search(),
-            Key::Char(c) => match self.document.insert(&self.cursor_position, c) {
-                Ok(_) => self.move_cursor(Key::Right),
-                Err(err) => {
-                    self.status_message =
-                        StatusMessage::from(format!("Failed to paste content: {err}"))
-                }
-            },
-            Key::Delete => match self.document.delete(&self.cursor_position) {
-                Ok(_) => (),
-                Err(err) => {
-                    self.status_message =
-                        StatusMessage::from(format!("Failed to remove content: {err}"))
-                }
-            },
-            Key::Backspace => {
-                if self.cursor_position.x > 0 || self.cursor_position.y > 0 {
-                    self.move_cursor(Key::Left);
+        let _ = match event {
+            Event::Key(k) => self.process_key(k),
+            _ => Ok(()),
+            // Key::Ctrl('c') => match self.copy_content() {
+            //     Ok(_) => (),
+            //     Err(err) => self.status_message = StatusMessage::from(format!("{err}")),
+            // },
+            // Key::Ctrl('v') => match self.paste_content() {
+            //     Ok(v) => {
+            //         for c in v.chars().rev() {
+            //             match self.document.insert(&self.cursor_position, c) {
+            //                 Ok(_) => (),
+            //                 Err(err) => {
+            //                     self.status_message =
+            //                         StatusMessage::from(format!("Failed to paste content: {err}"))
+            //                 }
+            //             }
+            //         }
+            //     }
+            //     Err(err) => {
+            //         self.status_message =
+            //             StatusMessage::from(format!("Failed to paste content: {err}"))
+            //     }
+            // },
+            // Key::Ctrl('q') => return self.quit(),
+            // Key::Ctrl('s') => self.save(),
+            // Key::Ctrl('f') => self.search(),
+            // Key::Char(c) => match self.document.insert(&self.cursor_position, c) {
+            //     Ok(_) => self.move_cursor(Key::Right),
+            //     Err(err) => {
+            //         self.status_message =
+            //             StatusMessage::from(format!("Failed to paste content: {err}"))
+            //     }
+            // },
+            // Key::Delete => match self.document.delete(&self.cursor_position) {
+            //     Ok(_) => (),
+            //     Err(err) => {
+            //         self.status_message =
+            //             StatusMessage::from(format!("Failed to remove content: {err}"))
+            //     }
+            // },
+            // Key::Backspace => {
+            //     if self.cursor_position.x > 0 || self.cursor_position.y > 0 {
+            //         self.move_cursor(Key::Left);
 
-                    match self.document.delete(&self.cursor_position) {
-                        Ok(_) => (),
-                        Err(err) => {
-                            self.status_message =
-                                StatusMessage::from(format!("Failed to remove character: {err}"))
-                        }
-                    }
-                }
-            }
-            Key::Up
-            | Key::Down
-            | Key::Left
-            | Key::Right
-            | Key::PageUp
-            | Key::PageDown
-            | Key::End
-            | Key::Home => self.move_cursor(pressed_key),
-            _ => (),
-        }
+            //         match self.document.delete(&self.cursor_position) {
+            //             Ok(_) => (),
+            //             Err(err) => {
+            //                 self.status_message =
+            //                     StatusMessage::from(format!("Failed to remove character: {err}"))
+            //             }
+            //         }
+            //     }
+            // }
+            // Key::Up
+            // | Key::Down
+            // | Key::Left
+            // | Key::Right
+            // | Key::PageUp
+            // | Key::PageDown
+            // | Key::End
+            // | Key::Home => self.move_cursor(pressed_key),
+            // _ => (),
+        };
 
         self.scroll();
 
         if self.quit_times < QUIT_TIME {
             self.quit_times = QUIT_TIME;
             self.status_message = StatusMessage::from(String::new());
+        }
+
+        Ok(())
+    }
+
+    fn process_key(&mut self, event: KeyEvent) -> Result<(), IOError> {
+        match event {
+            KeyEvent {
+                code: KeyCode::Char('q'),
+                modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                state: _,
+            } => return self.quit(),
+            KeyEvent {
+                code: KeyCode::Char('s'),
+                modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                state: _,
+            } => self.save(),
+            KeyEvent {
+                code: KeyCode::Char('f'),
+                modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                state: _,
+            } => self.search(),
+            KeyEvent {
+                code: KeyCode::Char(c),
+                modifiers: KeyModifiers::NONE | KeyModifiers::SHIFT,
+                kind: KeyEventKind::Press,
+                state: _,
+            } => {
+                match self.document.insert(&self.cursor_position, c) {
+                    Ok(_) => self.move_cursor(KeyEvent {
+                        code: KeyCode::Right,
+                        modifiers: KeyModifiers::NONE,
+                        kind: KeyEventKind::Press,
+                        state: KeyEventState::NONE,
+                    }),
+                    Err(err) => self.status_message = StatusMessage::from(format!("Failed to paste content: {err}"))
+                }
+            }
+            _ => {}
         }
 
         Ok(())
@@ -290,7 +351,7 @@ impl Revise {
         println!("{welcome_message}\r");
     }
 
-    fn move_cursor(&mut self, key: Key) {
+    fn move_cursor(&mut self, k: KeyEvent) {
         let terminal_height = self.terminal.size().height as usize;
         let Position { mut y, mut x } = self.cursor_position;
         let height = self.document.len();
@@ -300,14 +361,29 @@ impl Revise {
             0
         };
 
-        match key {
-            Key::Up => y = y.saturating_sub(1),
-            Key::Down => {
+        match k {
+            KeyEvent {
+                code: KeyCode::Up,
+                modifiers: KeyModifiers::NONE,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
+            } => y = y.saturating_sub(1),
+            KeyEvent {
+                code: KeyCode::Down,
+                modifiers: KeyModifiers::NONE,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
+            } => {
                 if y < height {
                     y = y.saturating_add(1);
                 }
             }
-            Key::Left => {
+            KeyEvent {
+                code: KeyCode::Left,
+                modifiers: KeyModifiers::NONE,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
+            } => {
                 if x > 0 {
                     x -= 1;
                 } else if y > 0 {
@@ -320,7 +396,12 @@ impl Revise {
                     }
                 }
             }
-            Key::Right => {
+            KeyEvent {
+                code: KeyCode::Right,
+                modifiers: KeyModifiers::NONE,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
+            } => {
                 if x < width {
                     x += 1;
                 } else if y < height {
@@ -328,22 +409,42 @@ impl Revise {
                     x = 0;
                 }
             }
-            Key::PageUp => {
+            KeyEvent {
+                code: KeyCode::PageUp,
+                modifiers: KeyModifiers::NONE,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
+            } => {
                 y = if y > terminal_height {
                     y.saturating_sub(terminal_height)
                 } else {
                     0
                 }
             }
-            Key::PageDown => {
+            KeyEvent {
+                code: KeyCode::PageDown,
+                modifiers: KeyModifiers::NONE,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
+            } => {
                 y = if y.saturating_add(terminal_height) < height {
                     y.saturating_add(terminal_height)
                 } else {
                     height
                 }
             }
-            Key::Home => x = 0,
-            Key::End => x = width,
+            KeyEvent {
+                code: KeyCode::Home,
+                modifiers: KeyModifiers::NONE,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
+            } => x = 0,
+            KeyEvent {
+                code: KeyCode::End,
+                modifiers: KeyModifiers::NONE,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
+            } => x = width,
             _ => (),
         }
 
@@ -412,8 +513,7 @@ impl Revise {
         Terminal::set_bg_color(STATUS_BG_COLOR);
         Terminal::set_fg_color(STATUS_FG_COLOR);
         println!("{status}\r");
-        Terminal::reset_fg_color();
-        Terminal::reset_bg_color();
+        Terminal::reset_color();
     }
 
     fn draw_message_bar(&self) {
@@ -430,7 +530,7 @@ impl Revise {
 
     fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, Box<dyn Err>>
     where
-        C: FnMut(&mut Self, Key, &String),
+        C: FnMut(&mut Self, Event, &String),
     {
         let mut result = String::new();
 
@@ -438,23 +538,46 @@ impl Revise {
             self.status_message = StatusMessage::from(format!("{prompt}{result}"));
             self.refresh_screen()?;
 
-            let key = Terminal::read_key()?;
+            let event = Terminal::read_event()?;
 
-            match key {
-                Key::Backspace => result.truncate(result.len().saturating_sub(1)),
-                Key::Char('\n') => break,
-                Key::Char(c) => {
-                    if !c.is_control() {
-                        result.push(c);
+            match event {
+                Event::Key(k) => match k {
+                    KeyEvent {
+                        code: KeyCode::Backspace,
+                        modifiers: KeyModifiers::NONE,
+                        kind: KeyEventKind::Press,
+                        state: _,
+                    } => result.truncate(result.len().saturating_sub(1)),
+                    KeyEvent {
+                        code: KeyCode::Char('\n'),
+                        modifiers: KeyModifiers::NONE,
+                        kind: KeyEventKind::Press,
+                        state: _,
+                    } => break,
+                    KeyEvent {
+                        code: KeyCode::Char(c),
+                        modifiers: KeyModifiers::NONE,
+                        kind: KeyEventKind::Press,
+                        state: _,
+                    } => {
+                        if !c.is_control() {
+                            result.push(c);
+                        }
                     }
-                }
-                Key::Esc => {
-                    result.truncate(0);
-                    break;
-                }
+                    KeyEvent {
+                        code: KeyCode::Esc,
+                        modifiers: KeyModifiers::NONE,
+                        kind: KeyEventKind::Press,
+                        state: _,
+                    } => {
+                        result.truncate(0);
+                        break;
+                    }
+                    _ => (),
+                },
                 _ => (),
             }
-            callback(self, key, &result);
+            callback(self, event, &result);
         }
 
         self.status_message = StatusMessage::from(String::new());
@@ -490,17 +613,47 @@ impl Revise {
         let query = self
             .prompt(
                 "Search (ESC to cancel, Arrows to navigate): ",
-                |revise, key, query| {
+                |revise, event, query| {
                     let mut moved = false;
 
-                    match key {
-                        Key::Right | Key::Down => {
-                            direction = SearchDirection::Forward;
-                            revise.move_cursor(Key::Right);
-                            moved = true;
-                        }
-                        Key::Left | Key::Up => direction = SearchDirection::Backward,
-                        _ => direction = SearchDirection::Forward,
+                    match event {
+                        Event::Key(k) => match k {
+                            KeyEvent {
+                                code: KeyCode::Right,
+                                modifiers: KeyModifiers::NONE,
+                                kind: KeyEventKind::Press,
+                                state: _,
+                            }
+                            | KeyEvent {
+                                code: KeyCode::Down,
+                                modifiers: KeyModifiers::NONE,
+                                kind: KeyEventKind::Press,
+                                state: _,
+                            } => {
+                                direction = SearchDirection::Forward;
+                                revise.move_cursor(KeyEvent {
+                                    code: KeyCode::Right,
+                                    modifiers: KeyModifiers::NONE,
+                                    kind: KeyEventKind::Press,
+                                    state: KeyEventState::NONE,
+                                });
+                                moved = true;
+                            }
+                            KeyEvent {
+                                code: KeyCode::Left,
+                                modifiers: KeyModifiers::NONE,
+                                kind: KeyEventKind::Press,
+                                state: _,
+                            }
+                            | KeyEvent {
+                                code: KeyCode::Up,
+                                modifiers: KeyModifiers::NONE,
+                                kind: KeyEventKind::Press,
+                                state: _,
+                            } => direction = SearchDirection::Backward,
+                            _ => direction = SearchDirection::Forward,
+                        },
+                        _ => (),
                     }
 
                     if let Some(position) =
@@ -511,7 +664,12 @@ impl Revise {
                         revise.cursor_position = position;
                         revise.scroll();
                     } else if moved {
-                        revise.move_cursor(Key::Left);
+                        revise.move_cursor(KeyEvent {
+                            code: KeyCode::Left,
+                            modifiers: KeyModifiers::NONE,
+                            kind: KeyEventKind::Press,
+                            state: KeyEventState::NONE,
+                        });
                     }
 
                     revise.highlighted_word = Some(query.to_owned());

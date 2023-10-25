@@ -2,8 +2,9 @@ use crate::highlight;
 use crate::HighlightOptions;
 use crate::SearchDirection;
 
+use crossterm::style::Color;
+use crossterm::style::Stylize;
 use std::cmp;
-use termion::color;
 use thiserror::Error;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -53,7 +54,7 @@ impl Row {
                 if highlight_type != current_highlight {
                     current_highlight = highlight_type;
 
-                    let start_highlight = format!("{}", color::Fg(highlight_type.to_color()),);
+                    let start_highlight = "".with(highlight_type.to_color()).to_string();
 
                     result.push_str(&start_highlight[..]);
                 }
@@ -66,13 +67,13 @@ impl Row {
             }
         }
 
-        let end_highlight = format!("{}", color::Fg(color::Reset),);
+        let end_highlight = "".with(Color::Reset).to_string();
 
         result.push_str(&end_highlight[..]);
 
         result
     }
-    
+
     pub fn len(&self) -> usize {
         self.len
     }
@@ -162,7 +163,7 @@ impl Row {
     pub fn as_bytes(&self) -> &[u8] {
         self.string.as_bytes()
     }
-    
+
     pub fn find(&self, query: &str, at: usize, direction: SearchDirection) -> Option<usize> {
         if at > self.len {
             return None;

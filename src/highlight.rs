@@ -1,4 +1,4 @@
-use termion::color;
+use crossterm::style::Color;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -20,17 +20,45 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn to_color(self) -> impl color::Color {
+    pub fn to_color(self) -> Color {
         match self {
-            Type::Number => color::Rgb(220, 163, 163),
-            Type::Match => color::Rgb(30, 139, 210),
-            Type::String => color::Rgb(211, 54, 130),
-            Type::_Boolean => color::Rgb(0, 0, 139),
-            Type::Char => color::Rgb(108, 113, 196),
-            Type::Comment | Type::MultilineComment => color::Rgb(133, 153, 0),
-            Type::PrimaryKeywords => color::Rgb(181, 137, 0),
-            Type::SecondaryKeywords => color::Rgb(42, 161, 152),
-            Type::None => color::Rgb(255, 255, 255),
+            Type::Number => Color::Rgb {
+                r: 220,
+                g: 163,
+                b: 163,
+            },
+            Type::Match => Color::Rgb {
+                r: 30,
+                g: 139,
+                b: 210,
+            },
+            Type::String => Color::Rgb {
+                r: 211,
+                g: 54,
+                b: 130,
+            },
+            Type::_Boolean => Color::Rgb { r: 0, g: 0, b: 139 },
+            Type::Char => Color::Rgb {
+                r: 108,
+                g: 113,
+                b: 196,
+            },
+            Type::Comment | Type::MultilineComment => Color::Rgb {
+                r: 133,
+                g: 153,
+                b: 0,
+            },
+            Type::PrimaryKeywords => Color::Rgb {
+                r: 181,
+                g: 137,
+                b: 0,
+            },
+            Type::SecondaryKeywords => Color::Rgb {
+                r: 42,
+                g: 161,
+                b: 152,
+            },
+            Type::None => Color::White,
         }
     }
 }
